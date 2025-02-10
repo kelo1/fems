@@ -38,7 +38,7 @@ class ValidatePhoneNumber extends Controller
     {
         //$client_id = $request->session()->get('id');
 
-        $client_id= $request->id;
+        $client_id= $request->client_id;
 
         $fields = $request->validate([
             'OTP'=>'required|integer'

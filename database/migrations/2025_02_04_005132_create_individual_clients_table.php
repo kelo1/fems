@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('address');
             $table->string('ghanapost_gps')->nullable();
             $table->string('document_type');
-            $table->string('document');
+            $table->string('document')->default('No Upload');
             $table->unsignedBigInteger('client_id')->unique();
             $table->foreign('client_id')->references('id')->on('clients')->onDelete('cascade');
             $table->timestamps();

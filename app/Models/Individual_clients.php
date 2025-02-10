@@ -11,9 +11,12 @@ class Individual_clients extends Model
 
     protected $fillable = [
         'first_name',
+        'middle_name',
         'last_name',
         'address',
         'document_type',
+        'document',
+        'ghanapost_gps',
         'client_id',
     ];
 
@@ -21,3 +24,4 @@ class Individual_clients extends Model
         return $this->belongsTo('\App\Client');
     }
 }
+

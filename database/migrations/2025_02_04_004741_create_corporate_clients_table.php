@@ -20,8 +20,8 @@ return new class extends Migration
             $table->string('company_phone');
             $table->string('company_address');
             $table->string('ghanapost_gps')->nullable();
-            $table->string('certificate_of_incorporation');
-            $table->string('company_registration');
+            $table->string('certificate_of_incorporation')->default('No Upload');
+            $table->string('company_registration')->default('No Upload');
             $table->unsignedBigInteger('client_id')->unique();
             $table->foreign('client_id')->references('id')->on('clients')->onDelete('cascade');
             $table->timestamps();

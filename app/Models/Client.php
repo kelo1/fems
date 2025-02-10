@@ -4,16 +4,19 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Laravel\Sanctum\HasApiTokens;
 
 class Client extends Model
 {
-    use Notifiable, HasApiTokens;
+    use HasFactory, HasApiTokens;
 
     protected $fillable = [
         'email',
         'phone',
         'password',
         'client_type',
+        'OTP',
+        'email_token',
     ];
 
     public function customerType(){

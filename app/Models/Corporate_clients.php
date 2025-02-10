@@ -14,9 +14,10 @@ class Corporate_clients extends Model
         'company_email',
         'company_phone',
         'company_address',
+        'ghanapost_gps',
         'certificate_of_incorporation',
         'company_registration',
-        'company_registration',
+        'client_id',
     ];
 
     public function client(){

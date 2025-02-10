@@ -16,6 +16,7 @@ use Aws\S3\Exception\S3Exception;
 use Aws\Sns\SnsClient;
 use Aws\Exception\AwsException;
 use Exception;
+use Illuminate\Support\Facades\Log;
 
 class CorporateClientsController extends Controller
 {
@@ -35,62 +36,84 @@ class CorporateClientsController extends Controller
     //Store Corporate client details
     public function store(Request $request)
     { 
-        $client_id = $request->id;
+        $client_id = $request->client_id;
         $company_email = $request->email;   
         $company_phone = $request->phone;
 
+        // Log the initial request data
+        Log::info('Corporate client store method called', $request->all());
+
         //Check if the Company exists
-        $check_client = Client::where('company_email',$company_email)->orWhere('company_phone',$company_phone)->first();
+        $check_corporate_client = Corporate_clients::where('id', $client_id)->first();
 
-        if($check_client){
-                
-            return response()->json(['message' => 'Client already exist'], 404);
+        if ($check_corporate_client) {
+            return response()->json(['message' => 'Corporate client already exist'], 404);
         }
-        
-        else{
 
-            //Store corporate client details
-        
-        DB::table('corporate_clients')->insert([
-            'company_name' => $request->company_name,
-            'company_address' => $request->company_address,
-            'company_email' => $company_email,
-            'company_phone' => $company_phone,
-            'certificate_of_incorporation'=> $request->certificate_of_incorporation,
-            'company_registration'=> $request->company_registration,
-            'client_id' => $client_id,
-            'created_at' => Carbon::now(),
-            'updated_at' => Carbon::now()
+        //Validate Corporate client details    
+        $request->validate([
+            'company_name' => 'required|string|max:255',
+            'company_address' => 'required|string|max:255',
+            'certificate_of_incorporation' => 'nullable|string|max:255',           
+            'company_registration' => 'nullable|string|max:255',
+            'ghanapost_gps' => 'nullable|string|max:255',
+            'client_id' => 'required|integer|unique:corporate_clients,client_id',
         ]);
 
-        //Check if document type is certificate of incorporation
-        if($request->certificate_of_incorporation){
-            $file = $request->file;
-            $filePath = $client_id.'/'.'certificate_of_incorporation_upload_'.$currentTime->toDateTimeString().'_'.$file->getClientOriginalName();
-            Storage::disk('s3')->put($filePath, file_get_contents($file));
-
-            DB::table('corporate_clients')
-            ->where('id', $client_id)
-            ->update([
-                'document' =>$filePath
+        // Log the validated request data
+        Log::info('Corporate client request data validated', $request->all());
+        
+        //Store corporate client details
+        try {
+            DB::table('corporate_clients')->insert([
+                'company_name' => $request->company_name,
+                'company_address' => $request->company_address,
+                'company_email' => $company_email,
+                'company_phone' => $company_phone,
+                'certificate_of_incorporation'=> $request->certificate_of_incorporation ?? 'No upload',
+                'company_registration'=> $request->company_registration ?? 'No upload',
+                'ghanapost_gps' => $request->ghanapost_gps,
+                'client_id' => $client_id,
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now()
             ]);
 
+            Log::info('Corporate client details inserted', ['client_id' => $client_id]);
+
+            //Check if document type is certificate of incorporation
+            if($request->hasFile('file') && $request->certificate_of_incorporation){
+                $file = $request->file('file');
+                $filePath = $client_id.'/' . 'certificate_of_incorporation_upload_' . Carbon::now()->toDateTimeString().'_'.$file->getClientOriginalName();
+                Storage::disk('s3')->put($filePath, file_get_contents($file));
+
+                DB::table('corporate_clients')
+                ->where('client_id', $client_id)
+                ->update([
+                    'certificate_of_incorporation' =>$filePath
+                ]);
+
+                Log::info('Certificate of incorporation uploaded', ['filePath' => $filePath]);
             }
 
-        //Check if document type is business registration
-        if($request->company_registration){
-            $file = $request->file;
-            $filePath = $client_id.'/'.'company_registration_upload_'.$currentTime->toDateTimeString().'_'.$file->getClientOriginalName();
-            Storage::disk('s3')->put($filePath, file_get_contents($file));
+            //Check if document type is business registration
+            if($request->hasFile('file') && $request->company_registration){
+                $file = $request->file('file');
+                $filePath = $client_id.'/' . 'company_registration_upload_' . Carbon::now()->toDateTimeString().'_'.$file->getClientOriginalName();
+                Storage::disk('s3')->put($filePath, file_get_contents($file));
 
-            DB::table('corporate_clients')
-            ->where('id', $client_id)
-            ->update([
-                'document' =>$filePath
-            ]);
+                DB::table('corporate_clients')
+                ->where('client_id', $client_id)
+                ->update([
+                    'company_registration' =>$filePath
+                ]);
 
+                Log::info('Company registration uploaded', ['filePath' => $filePath]);
             }    
 
+            return response()->json(['message' => 'Corporate client created successfully'], 201);
+        } catch (Exception $e) {
+            Log::error('Failed to create corporate client details', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to create corporate client details'], 500);
         }
     }
 }

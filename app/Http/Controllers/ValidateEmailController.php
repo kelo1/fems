@@ -38,7 +38,7 @@ class ValidateEmailController extends Controller
        // $client = Client::findOrFail($email_token);
        $email_token = $request->email_token;
 
-      $client_id =  $request->id;
+      $client_id =  $request->client_id;
 
       $email_token_query = Client::where('id',$client_id)->value('email_token');
 
@@ -84,8 +84,8 @@ class ValidateEmailController extends Controller
 
 
          DB::table('clients')
-    ->where('email', $toAddress)
-    ->update(['email_token' => $email_verification, ]);
+        ->where('email', $toAddress)
+        ->update(['email_token' => $email_verification, ]);
 
     }
 
