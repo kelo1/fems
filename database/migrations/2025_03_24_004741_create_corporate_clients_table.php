@@ -19,11 +19,13 @@ return new class extends Migration
             $table->string('company_email');
             $table->string('company_phone');
             $table->string('company_address');
-            $table->string('ghanapost_gps')->nullable();
+            $table->string('gps_address')->nullable();
             $table->string('certificate_of_incorporation')->default('No Upload');
             $table->string('company_registration')->default('No Upload');
             $table->unsignedBigInteger('client_id')->unique();
+            $table->unsignedBigInteger('corporate_type_id')->nullable();
             $table->foreign('client_id')->references('id')->on('clients')->onDelete('cascade');
+            $table->foreign('corporate_type_id')->references('id')->on('corporate_types')->onDelete('set null');
             $table->timestamps();
         });
     }

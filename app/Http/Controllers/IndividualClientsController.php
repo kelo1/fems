@@ -30,7 +30,20 @@ class IndividualClientsController extends Controller
     //Display all individual clients
     public function index(){
 
-            return Individual_clients::all();
+        return Individual_clients::all();
+    }
+
+
+    public function getIndividualClients()
+    {
+        $individualClients = Individual_clients::with('client')->get();
+        return response()->json($individualClients);
+    }
+
+    public function getIndividualClientsByID($id)
+    { 
+        $corporateClient = Individual_clients::with('client')->where('client_id', $id)->first();
+        return response()->json($corporateClient);
     }
 
     //Store individual client details
@@ -50,7 +63,7 @@ class IndividualClientsController extends Controller
             'middle_name' => 'nullable|string|max:255',
             'last_name' => 'required|string|max:255',
             'address' => 'required|string|max:255',
-            'ghanapost_gps' => 'nullable|string|max:255',
+            'gps_address' => 'nullable|string|max:255',
             'document_type' => 'required|string|max:255',
             'document' => 'nullable|string|max:255',
             'client_id' => 'required|integer|unique:individual_clients,client_id',
@@ -62,7 +75,7 @@ class IndividualClientsController extends Controller
             'middle_name' => $request->middle_name,
             'last_name' => $request->last_name,
             'address' => $request->address,
-            'ghanapost_gps' => $request->ghanapost_gps,
+            'gps_address' => $request->gps_address,
             'document_type' => $request->document_type,
             'document' => $request->document ?? 'No upload',
             'client_id' => $client_id,

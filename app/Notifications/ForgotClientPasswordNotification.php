@@ -48,7 +48,7 @@ class ForgotClientPasswordNotification extends Notification
        // $url=URL::to('/verify_email/?verifycode=');
        //forceRootUrl
 
-      $url = URL::to('https://testapp.i-visas.com/reset_password/?email_token=');
+      $url = URL::to('https://fems.com//reset_password/?email_token=');
 
        //$url=URL::to('localhost:3000/test');
         return (new MailMessage)

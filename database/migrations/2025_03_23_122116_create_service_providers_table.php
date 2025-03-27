@@ -13,17 +13,17 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('individual_clients', function (Blueprint $table) {
+        Schema::create('service_providers', function (Blueprint $table) {
             $table->id();
-            $table->string('first_name');
-            $table->string('middle_name')->nullable();
-            $table->string('last_name');
+            $table->string('name');
             $table->string('address');
+            $table->string('email')->unique();
+            $table->string('phone')->unique();
+            $table->string('password');
+            $table->boolean('isActive')->default(false);
             $table->string('gps_address')->nullable();
-            $table->string('document_type');
-            $table->string('document')->default('No Upload');
-            $table->unsignedBigInteger('client_id')->unique();
-            $table->foreign('client_id')->references('id')->on('clients')->onDelete('cascade');
+            $table->unsignedBigInteger('license_id')->nullable();
+            $table->foreign('license_id')->references('id')->on('license_types')->onDelete('set null');
             $table->timestamps();
         });
     }
@@ -35,6 +35,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('individual_clients');
+        Schema::dropIfExists('service_providers');
     }
 };

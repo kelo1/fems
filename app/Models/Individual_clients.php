@@ -16,12 +16,12 @@ class Individual_clients extends Model
         'address',
         'document_type',
         'document',
-        'ghanapost_gps',
+        'gps_address',
         'client_id',
     ];
 
     public function client(){
-        return $this->belongsTo('\App\Client');
+        return $this->belongsTo(Client::class, 'client_id');
     }
 }
 

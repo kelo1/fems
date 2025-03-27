@@ -2,18 +2,24 @@
 
 namespace App\Providers;
 
-// use Illuminate\Support\Facades\Gate;
-use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+use App\Models\Equipment;
+use App\Policies\EquipmentPolicy;
+use App\Models\FEMSAdmin;
+use App\Policies\UserPolicy;
+use Illuminate\Foundation\Support\Providers\AuthServiceProvider as BaseAuthServiceProvider;
+use Illuminate\Support\Facades\Gate;
 
-class AuthServiceProvider extends ServiceProvider
+class AuthServiceProvider extends BaseAuthServiceProvider
 {
     /**
-     * The model to policy mappings for the application.
+     * The policy mappings for the application.
      *
-     * @var array<class-string, class-string>
+     * @var array
      */
     protected $policies = [
-        // 'App\Models\Model' => 'App\Policies\ModelPolicy',
+        Equipment::class => EquipmentPolicy::class,
+        FEMSAdmin::class => UserPolicy::class,
+        
     ];
 
     /**
@@ -24,7 +30,9 @@ class AuthServiceProvider extends ServiceProvider
     public function boot()
     {
         $this->registerPolicies();
-
-        //
+        Gate::define('update-isActive', [UserPolicy::class, 'updateIsActive']);
+        Gate::define('update-user', [UserPolicy::class, 'update']);
+        Gate::define('delete-user', [UserPolicy::class, 'delete']);
+   
     }
 }

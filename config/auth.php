@@ -40,6 +40,32 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        'api' => [
+            'driver' => 'token',
+            'provider' => 'users',
+            'hash' => false,
+        ],
+
+        'fems_admin' => [
+            'driver' => 'session',
+            'provider' => 'fems_admins',
+        ],
+
+        'fire_service_agent' => [
+            'driver' => 'session',
+            'provider' => 'fire_service_agents',
+        ],
+
+        'service_provider' => [
+            'driver' => 'session',
+            'provider' => 'service_providers',
+        ],
+
+        'gra' => [
+            'driver' => 'session',
+            'provider' => 'gras',
+        ],
     ],
 
     /*
@@ -65,10 +91,25 @@ return [
             'model' => App\Models\User::class,
         ],
 
-        // 'users' => [
-        //     'driver' => 'database',
-        //     'table' => 'users',
-        // ],
+        'fems_admins' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\FEMSAdmin::class,
+        ],
+
+        'fire_service_agents' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\FireServiceAgent::class,
+        ],
+
+        'service_providers' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\ServiceProvider::class,
+        ],
+
+        'gras' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\GRA::class,
+        ],
     ],
 
     /*
@@ -89,6 +130,34 @@ return [
     'passwords' => [
         'users' => [
             'provider' => 'users',
+            'table' => 'password_resets',
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+
+        'fems_admins' => [
+            'provider' => 'fems_admins',
+            'table' => 'password_resets',
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+
+        'fire_service_agents' => [
+            'provider' => 'fire_service_agents',
+            'table' => 'password_resets',
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+
+        'service_providers' => [
+            'provider' => 'service_providers',
+            'table' => 'password_resets',
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+
+        'gras' => [
+            'provider' => 'gras',
             'table' => 'password_resets',
             'expire' => 60,
             'throttle' => 60,

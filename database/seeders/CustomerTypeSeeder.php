@@ -23,6 +23,6 @@ class CustomerTypeSeeder extends Seeder
 
        CustomerType::create([
         'name' => 'CORPORATE',
-    ]);
+       ]);
     }
 }

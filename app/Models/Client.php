@@ -19,15 +19,29 @@ class Client extends Model
         'email_token',
     ];
 
-    public function customerType(){
-        return $this->hasOne('\App\CustomerType');
+    protected $hidden = [
+        'password',
+    ];
+
+    public function customerType()
+    {
+        return $this->hasOne(CustomerType::class);
     }
 
-    public function individualClient(){
-        return $this->hasOne('\App\Individual_clients');
+    public function individualClient()
+    {
+        return $this->hasOne(Individual_clients::class, 'client_id');
     }
 
-    public function corporateClient(){
-        return $this->hasOne('\App\Corporate_clients');
+    public function corporateClient()
+    {
+        return $this->hasOne(Corporate_clients::class, 'client_id');
     }
+
+    public function equipment()
+    {
+        return $this->hasMany(Equipment::class);
+    }
+
+    
 }

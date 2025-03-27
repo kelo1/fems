@@ -194,6 +194,8 @@ return [
         // App\Providers\BroadcastServiceProvider::class,
         App\Providers\EventServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
+        
+        SimpleSoftwareIO\QrCode\QrCodeServiceProvider::class,
 
     ],
 
@@ -210,6 +212,11 @@ return [
 
     'aliases' => Facade::defaultAliases()->merge([
         // 'ExampleClass' => App\Example\ExampleClass::class,
+        'QrCode' => SimpleSoftwareIO\QrCode\Facades\QrCode::class
     ])->toArray(),
+
+    'femsadmin_name' => env('FEMSADMIN_NAME', 'Default Admin Name'),
+    'femsadmin_email' => env('FEMSADMIN_EMAIL', 'admin@example.com'),
+    'femsadmin_password' => env('FEMSADMIN_PASSWORD', 'password'),
 
 ];

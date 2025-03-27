@@ -11,16 +11,23 @@ class Corporate_clients extends Model
 
     protected $fillable = [
         'company_name',
+        'company_address',
         'company_email',
         'company_phone',
-        'company_address',
-        'ghanapost_gps',
         'certificate_of_incorporation',
         'company_registration',
+        'gps_address',
         'client_id',
+        'corporate_type_id',
     ];
 
-    public function client(){
-        return $this->belongsTo('\App\Client');
+    public function client()
+    {
+        return $this->belongsTo(Client::class, 'client_id');
+    }
+
+    public function corporateType()
+    {
+        return $this->belongsTo(CorporateType::class);
     }
 }

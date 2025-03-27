@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\Corporate_clients;
+use App\Models\CorporateType;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Hash;
@@ -30,8 +31,21 @@ class CorporateClientsController extends Controller
     //Display all Corporate clients
      public function index()
      {
-         return Corporate_clients::all();
+        return Corporate_clients::all();
      }
+
+      // Get all corporate clients
+    public function getCorporateClients()
+    {
+        $corporateClients = Corporate_clients::with('client', 'corporateType')->get();
+        return response()->json($corporateClients);
+    }
+
+    public function getCorporateClientByID($id)
+    {
+        $corporateClient = Corporate_clients::with('client', 'corporateType')->where('client_id', $id)->first();
+        return response()->json($corporateClient);
+    }
 
     //Store Corporate client details
     public function store(Request $request)
@@ -54,10 +68,13 @@ class CorporateClientsController extends Controller
         $request->validate([
             'company_name' => 'required|string|max:255',
             'company_address' => 'required|string|max:255',
+            'company_email' => 'required|string|max:255',
+            'company_phone' => 'required|string|max:15',
             'certificate_of_incorporation' => 'nullable|string|max:255',           
             'company_registration' => 'nullable|string|max:255',
-            'ghanapost_gps' => 'nullable|string|max:255',
+            'gps_address' => 'nullable|string|max:255',
             'client_id' => 'required|integer|unique:corporate_clients,client_id',
+            'corporate_type_id' => 'required|integer|exists:corporate_types,id',
         ]);
 
         // Log the validated request data
@@ -68,11 +85,12 @@ class CorporateClientsController extends Controller
             DB::table('corporate_clients')->insert([
                 'company_name' => $request->company_name,
                 'company_address' => $request->company_address,
-                'company_email' => $company_email,
-                'company_phone' => $company_phone,
+                'company_email' => $request->company_email ?? $company_email,
+                'company_phone' => $request->company_phone ?? $company_phone,
                 'certificate_of_incorporation'=> $request->certificate_of_incorporation ?? 'No upload',
                 'company_registration'=> $request->company_registration ?? 'No upload',
-                'ghanapost_gps' => $request->ghanapost_gps,
+                'gps_address' => $request->gps_address,
+                'corporate_type_id' => $request->corporate_type_id,
                 'client_id' => $client_id,
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now()
