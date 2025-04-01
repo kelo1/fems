@@ -23,7 +23,7 @@ class AuthController extends Controller
          $admin = Auth::user();
     
          if (!$admin) {
-             return response()->json(['message' => 'Unauthorized: Admin user not found'], 403);
+             return response()->json(['message' => 'Unauthorized: Admin user not found'], 401);
          }
  
          // Get the authenticated user
@@ -32,13 +32,13 @@ class AuthController extends Controller
          // Ensure the authenticated user is a FEMSAdmin
          if (!$admin instanceof FEMSAdmin) {
              \Log::warning('Unauthorized attempt to update isActive', ['auth_user' => $admin]);
-             return response()->json(['message' => 'You\'re Unauthorized to perform this action'], 403);
+             return response()->json(['message' => 'You\'re Unauthorized to perform this action'], 401);
          }
 
         // Check authorization using policy
         if (!Gate::allows('update-isActive', $admin)) {
             \Log::warning('Unauthorized attempt to update isActive', ['auth_user' => $admin, 'target_id' => $id, 'user_type' => $request->user_type]);
-            return response()->json(['message' => 'Unauthorized'], 403);
+            return response()->json(['message' => 'You\'re Unauthorized to perform this action'], 401);
         }
 
         $serviceProviders = ServiceProvider::all();
@@ -278,7 +278,7 @@ class AuthController extends Controller
             // Ensure the authenticated user is a FEMSAdmin
             if (!$admin instanceof FEMSAdmin) {
                 \Log::warning('Unauthorized attempt to update isActive', ['auth_user' => $admin]);
-                return response()->json(['message' => 'You\'re Unauthorized to perform this action'], 403);
+                return response()->json(['message' => 'You\'re Unauthorized to perform this action'], 401);
             }
     
             // Determine the user type and find the user
@@ -374,7 +374,7 @@ class AuthController extends Controller
             // Ensure the authenticated user is a FEMSAdmin
             if (!$admin instanceof FEMSAdmin) {
                 \Log::warning('Unauthorized attempt to access showbyUserType', ['auth_user' => $admin]);
-                return response()->json(['message' => 'You\'re Unauthorized to perform this action'], 403);
+                return response()->json(['message' => 'You\'re Unauthorized to perform this action'], 401);
             }
     
             // Determine the user type and fetch the users
@@ -412,7 +412,7 @@ class AuthController extends Controller
             $admin = Auth::user();
     
             if (!$admin) {
-                return response()->json(['message' => 'Unauthorized: Admin user not found'], 403);
+                return response()->json(['message' => 'Unauthorized: Admin user not found'], 401);
             }
     
             // Get the authenticated user
@@ -421,7 +421,7 @@ class AuthController extends Controller
             // Ensure the authenticated user is a FEMSAdmin
             if (!$admin instanceof FEMSAdmin) {
                 \Log::warning('Unauthorized attempt to update isActive', ['auth_user' => $admin]);
-                return response()->json(['message' => 'You\'re Unauthorized to perform this action'], 403);
+                return response()->json(['message' => 'You\'re Unauthorized to perform this action'], 401);
             }
 
             // Determine the user type and find the user
