@@ -14,6 +14,9 @@ use App\Http\Controllers\FireServiceAgentController;
 use App\Http\Controllers\FEMSAdminController;
 use App\Http\Controllers\QRCodeController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\GRAController;
+use App\Http\Controllers\UserTypeController;
+use App\Http\Controllers\LicenseTypeController;
 
 
 /*
@@ -46,6 +49,13 @@ Route::post('client/fems/email/resend', [ValidateEmailController::class, 'resend
 //Password Reset - Client
 Route::post('client/password/forgotpassword', [ForgotPasswordController::class, 'submitForgetPasswordForm'])->name('client_forgot_password');
 Route::post('client/password/resetpassword', [ForgotPasswordController::class, 'submitResetPasswordForm'])->name('client_reset_password');
+
+
+// User Type Routes
+Route::get('user_type/all', [UserTypeController::class, 'index'])->name('user_type_index');
+
+// License Type Routes
+Route::get('license_type/all', [LicenseTypeController::class, 'index'])->name('license_type_index');
 
 //---------------------------------------------------------------------------------------------------------//
 
@@ -117,6 +127,14 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::post('/qrcode/generate/{serial_number}', [QRCodeController::class, 'generateQrCode'])->name('generate_qr_code');
   Route::put('/qrcode/update/{serial_number}', [QRCodeController::class, 'updateQrCode'])->name('decode_qr_code');
   Route::get('/qrcode/decode/{serial_number}', [QRCodeController::class, 'decodeQrCode'])->name('auth:sanctum');
+
+  //Protected User Type Routes
+  Route::post('/user_type/create', [UserTypeController::class, 'store'])->name('user_type_store');
+  Route::delete('/user_type/delete/{id}', [UserTypeController::class, 'destroy'])->name('user_type_delete');
+
+  //Protected License Type Routes
+  Route::post('/license_type/create', [LicenseTypeController::class, 'store'])->name('license_type_store');
+  Route::delete('/license_type/delete/{id}', [LicenseTypeController::class, 'destroy'])->name('license_type_delete');
 });
 
 

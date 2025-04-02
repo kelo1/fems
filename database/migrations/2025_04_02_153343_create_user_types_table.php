@@ -13,11 +13,10 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('license_types', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->unique();
-            $table->text('description');
-            $table->timestamps();
+        Schema::create('user_types', function (Blueprint $table) {
+            $table->id(); // Auto-incrementing ID
+            $table->string('user_type')->unique(); // User type (e.g., SERVICE_PROVIDER, FSA_AGENT)
+            $table->timestamps(); // Created at and updated at timestamps
         });
     }
 
@@ -28,6 +27,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('license_types');
+        Schema::dropIfExists('user_types');
     }
 };

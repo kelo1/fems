@@ -18,5 +18,6 @@ class DatabaseSeeder extends Seeder
         $this->call(FEMSAdminSeeder::class);
         $this->call(CorporateTypeSeeder::class);
         $this->call(LicenseTypeSeeder::class);
+        $this->call(UserTypeSeeder::class);
     }
 }
