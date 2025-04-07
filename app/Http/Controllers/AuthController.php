@@ -444,5 +444,66 @@ class AuthController extends Controller
         }
     }
 
+    // Validate email
+    public function validateEmail(Request $request)
+    {
+        try {
+            \Log::info('validateEmail method called', ['request_data' => $request->all()]);
 
+            // Validate the request
+            $request->validate([
+                'user_type' => ['required', Rule::in(['SERVICE_PROVIDER', 'FSA_AGENT', 'GRA_PERSONNEL'])],
+                'email' => 'required|string|email',
+            ]);
+
+            // Determine the user type and check if the email exists
+            $emailExists = match (strtoupper($request->user_type)) {
+                'SERVICE_PROVIDER' => ServiceProvider::where('email', $request->email)->exists(),
+                'FSA_AGENT' => FireServiceAgent::where('email', $request->email)->exists(),
+                'GRA_PERSONNEL' => GRA::where('email', $request->email)->exists(),
+            };
+
+            if ($emailExists) {
+                return response()->json(['message' => 'Email already exists'], 409); // Conflict
+            }
+
+            return response()->json(['message' => 'Email is available'], 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Error in validateEmail method', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'An error occurred'], 500);
+        }
+    }
+
+    // Validate phone
+    public function validatePhone(Request $request)
+    {
+        try {
+            \Log::info('validatePhone method called', ['request_data' => $request->all()]);
+
+            // Validate the request
+            $request->validate([
+                'user_type' => ['required', Rule::in(['SERVICE_PROVIDER', 'FSA_AGENT', 'GRA_PERSONNEL'])],
+                'phone' => 'required|string',
+            ]);
+
+            // Determine the user type and check if the phone exists
+            $phoneExists = match (strtoupper($request->user_type)) {
+                'SERVICE_PROVIDER' => ServiceProvider::where('phone', $request->phone)->exists(),
+                'FSA_AGENT' => FireServiceAgent::where('phone', $request->phone)->exists(),
+                'GRA_PERSONNEL' => GRA::where('phone', $request->phone)->exists(),
+            };
+
+            if ($phoneExists) {
+                return response()->json(['message' => 'Phone number already exists'], 409); // Conflict
+            }
+
+            return response()->json(['message' => 'Phone number is available'], 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Error in validatePhone method', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'An error occurred'], 500);
+        }
+    }
+    
 }

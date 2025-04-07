@@ -68,8 +68,8 @@ class CorporateClientsController extends Controller
         $request->validate([
             'company_name' => 'required|string|max:255',
             'company_address' => 'required|string|max:255',
-            'company_email' => 'required|string|max:255',
-            'company_phone' => 'required|string|max:15',
+            'company_email' => 'sometimes|string|max:255',
+            'company_phone' => 'sometimes|string|max:15',
             'certificate_of_incorporation' => 'nullable|string|max:255',           
             'company_registration' => 'nullable|string|max:255',
             'gps_address' => 'nullable|string|max:255',

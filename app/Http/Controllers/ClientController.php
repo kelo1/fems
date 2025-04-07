@@ -43,47 +43,44 @@ class ClientController extends Controller
     {
         \Log::info('ClientController store method called', $request->all());
 
-        // Ensure the request is made by an authenticated FEMSAdmin, FireServiceAgent, or ServiceProvider
-        // if (!Auth::guard('fems_admin')->check() && !Auth::guard('fire_service_agent')->check() && !Auth::guard('service_provider')->check()) {
-        //     return response(['message' => 'Unauthorized'], 403);
-        // }
-        $user = Auth::guard('fems_admin')->user() 
-            ?? Auth::guard('fire_service_agent')->user() 
-            ?? Auth::guard('service_provider')->user();
-
-        \Log::info('Authenticated User:', ['user' => $user]);
+        $user = Auth::user();
 
         if (!$user) {
             return response(['message' => 'Unauthorized'], 403);
         }
+        
         // Validate request
         $request->validate([
-            'email' => 'required|string',
+            'email' => 'required|string|email|unique:clients,email',
             'phone' => 'required|string|unique:clients,phone',
-            'password' => 'required|string|confirmed',
             'client_type' => 'required|string',
         ]);
 
-        // Generate OTP
+        // Generate a random password
+        $randomPassword = Str::random(12);
+
+        // Generate OTP and email verification token
         $otp = $this->generateOTP();
         $email_verification = Str::uuid()->toString();
 
+        // Create the client
         $client = Client::create([
             'email' => $request->email,
             'phone' => $request->phone,
-            'password' => Hash::make($request->password),
+            'password' => Hash::make($randomPassword),
             'client_type' => $request->client_type,
             'OTP' => $otp,
-            'email_token' => $email_verification
+            'email_token' => $email_verification,
         ]);
 
-        // Check if client was created
+
+// Check if client was created
         if (!$client) {
             \Log::error('Client creation failed');
             return response(['message' => 'Client creation failed'], 500);
         }
 
-        // Get the last inserted item
+// Get the last inserted item
         $itemId = DB::getPdo()->lastInsertId();
         \Log::info('Client created with ID', ['client_id' => $itemId]);
 
@@ -141,8 +138,8 @@ class ClientController extends Controller
                 }
 
                 $response = [
-                    'message' => 'Corporate Client created Successfully',
-                    'client_id' => $itemId,
+            'message' => 'Corporate Client created Successfully',
+            'client_id' => $itemId,
                     'company_name' => $corporate_details->company_name,
                     'company_address' => $corporate_details->company_address,
                     'company_email' => $corporate_details->company_email,
@@ -166,20 +163,17 @@ class ClientController extends Controller
     }
 
     // Bulk upload clients
-        public function bulkUpload(Request $request)
+    public function bulkUpload(Request $request)
     {
         \Log::info('ClientController bulkUpload method called', $request->all());
 
         // Authenticate user
-        $user = Auth::guard('fems_admin')->user() 
-            ?? Auth::guard('fire_service_agent')->user() 
-            ?? Auth::guard('service_provider')->user();
+        $user = Auth::user();
 
-        \Log::info('Authenticated User:', ['user' => $user]);
-        
         if (!$user) {
             return response(['message' => 'Unauthorized'], 403);
         }
+        
 
         DB::enableQueryLog(); // Enable query logging
 
@@ -191,13 +185,16 @@ class ClientController extends Controller
                 $clientIds = [];
 
                 foreach ($clients as $client) {
+
+                    $randomPassword = Str::random(12);
+
                     $otp = $this->generateOTP();
                     $email_verification = Str::uuid()->toString();
 
                     $clientId = Client::insertGetId([
                         'email' => $client['email'],
                         'phone' => $client['phone'],
-                        'password' => Hash::make($client['password']),
+                        'password' => Hash::make($randomPassword),
                         'client_type' => strtoupper($client['client_type']),
                         'OTP' => $otp,
                         'email_token' => $email_verification,
@@ -206,6 +203,17 @@ class ClientController extends Controller
                     ]);
 
                     $clientIds[$client['email']] = $clientId;
+
+                     // Send the generated password to the client via email or SMS
+               // Mail::to($client['email'])->send(new \App\Mail\ClientPasswordMail($randomPassword));
+               
+                // Optionally, you can also send the password via SMS using a service like Twilio or AWS SNS
+                // $snsClient = new SnsClient([
+                //     'region' => 'your-region',
+                //     'version' => 'latest',
+                //     'credentials' => [
+                //         'key' => 'your-access-key-id',
+
                     \Log::info('Inserted client and retrieved ID:', ['client_id' => $clientId]);
                 }
 
@@ -280,15 +288,12 @@ class ClientController extends Controller
     public function update(Request $request, $id)
     {
         // Authenticate user
-        $user = Auth::guard('fems_admin')->user() 
-            ?? Auth::guard('fire_service_agent')->user() 
-            ?? Auth::guard('service_provider')->user();
+        $user = Auth::user();
 
-        \Log::info('Authenticated User:', ['user' => $user]);
-        
         if (!$user) {
             return response(['message' => 'Unauthorized'], 403);
         }
+        
 
 
         \Log::info("Updating client with ID: $id");
@@ -393,15 +398,12 @@ class ClientController extends Controller
     public function show($id)
     {
         // Authenticate user
-        $user = Auth::guard('fems_admin')->user() 
-            ?? Auth::guard('fire_service_agent')->user() 
-            ?? Auth::guard('service_provider')->user();
-
-        \Log::info('Authenticated User:', ['user' => $user]);
+        $user = Auth::user();
 
         if (!$user) {
             return response(['message' => 'Unauthorized'], 403);
         }
+        
 
         //Check if client is individual or corporate
          $client = Client::find($id);
@@ -517,15 +519,12 @@ class ClientController extends Controller
     public function destroy($id)
     {
     // Authenticate user
-    $user = Auth::guard('fems_admin')->user() 
-    ?? Auth::guard('fire_service_agent')->user() 
-    ?? Auth::guard('service_provider')->user();
-
-    \Log::info('Authenticated User:', ['user' => $user]);
+    $user = Auth::user();
 
     if (!$user) {
         return response(['message' => 'Unauthorized'], 403);
     }
+    
 
     \Log::info("Deleting client with ID: $id");
 

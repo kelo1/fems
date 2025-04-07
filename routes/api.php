@@ -57,6 +57,10 @@ Route::get('user_type/all', [UserTypeController::class, 'index'])->name('user_ty
 // License Type Routes
 Route::get('license_type/all', [LicenseTypeController::class, 'index'])->name('license_type_index');
 
+// Validate User Phone Number and Email Routes
+Route::post('/user/validate_email', [AuthController::class, 'validateEmail'])->name('validate_email');
+Route::post('/user/validate_phone', [AuthController::class, 'validatePhone'])->name('validate_phone_number');
+
 //---------------------------------------------------------------------------------------------------------//
 
 //Protected routes which require authentication
@@ -136,7 +140,6 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::post('/license_type/create', [LicenseTypeController::class, 'store'])->name('license_type_store');
   Route::delete('/license_type/delete/{id}', [LicenseTypeController::class, 'destroy'])->name('license_type_delete');
 });
-
 
 // Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 //     return $request->user();
