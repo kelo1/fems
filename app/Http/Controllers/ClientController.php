@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\Corporate_clients;
 use App\Models\Individual_clients;
+use App\Models\CorporateType;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Hash;
@@ -71,6 +72,9 @@ class ClientController extends Controller
             'client_type' => $request->client_type,
             'OTP' => $otp,
             'email_token' => $email_verification,
+            'created_by' => $user->id, 
+            'created_by_type' => get_class($user), // Store the type of user who created the client
+
         ]);
 
 
@@ -178,7 +182,7 @@ class ClientController extends Controller
         DB::enableQueryLog(); // Enable query logging
 
         try {
-            DB::transaction(function () use ($request) {
+            DB::transaction(function () use ($request, $user) {
                 \Log::info('Transaction started');
 
                 $clients = $request->input('clients');
@@ -198,6 +202,8 @@ class ClientController extends Controller
                         'client_type' => strtoupper($client['client_type']),
                         'OTP' => $otp,
                         'email_token' => $email_verification,
+                        'created_by' => $user->id,
+                        'created_by_type' => get_class($user), // Store the type of user who created the client
                         'created_at' => Carbon::now(),
                         'updated_at' => Carbon::now(),
                     ]);
@@ -579,4 +585,101 @@ class ClientController extends Controller
             'message' => 'Logout Successful'
         ], 200);
     }
+    // Get all corporate clients filtered by user type
+    // This method retrieves corporate clients based on the user type (FEMSAdmin or other users)
+
+    public function getClientByCorporateType($corporateTypeId)
+    {
+        try {
+            \Log::info('getClientsByCorporateType method called', ['corporate_type_id' => $corporateTypeId]);
+
+            // Authenticate the user
+            $user = Auth::user();
+
+            if (!$user) {
+                return response(['message' => 'Unauthorized'], 403);
+            }
+
+            // Check if the CorporateType exists
+            $corporateType = CorporateType::find($corporateTypeId);
+
+            if (!$corporateType) {
+                return response()->json(['message' => 'Corporate type not found'], 404);
+            }
+
+            // Check user type
+            $userType = get_class($user);
+
+            if ($userType === 'App\Models\FEMSAdmin') {
+                // FEMSAdmin can see all clients
+                $clients = DB::table('corporate_clients')
+                    ->join('clients', 'corporate_clients.client_id', '=', 'clients.id')
+                    ->where('corporate_clients.corporate_type_id', $corporateTypeId)
+                    ->select('clients.*', 'corporate_clients.corporate_type_id')
+                    ->get();
+            } else {
+                // Other users can only see clients they created
+                $clients = DB::table('corporate_clients')
+                    ->join('clients', 'corporate_clients.client_id', '=', 'clients.id')
+                    ->where('corporate_clients.corporate_type_id', $corporateTypeId)
+                    ->where('clients.created_by', $user->id)
+                    ->where('clients.created_by_type', $userType) // Filter by user type
+                    ->select('clients.*', 'corporate_clients.corporate_type_id')
+                    ->get();
+            }
+
+            return response()->json([
+                'message' => 'Clients retrieved successfully',
+                'corporate_type' => $corporateType->name,
+                'clients' => $clients,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error in getClientsByCorporateType method', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'An error occurred'], 500);
+        }
+    }
+
+    // Get all individual clients filtered by user type
+    // This method retrieves individual clients based on the user type (FEMSAdmin or other users)
+    public function getClientByIndividual()
+    {
+        try {
+            \Log::info('getClientByIndividual method called');
+    
+            // Authenticate the user
+            $user = Auth::user();
+    
+            if (!$user) {
+                return response(['message' => 'Unauthorized'], 403);
+            }
+    
+            // Check user type
+            $userType = get_class($user);
+    
+            if ($userType === 'App\Models\FEMSAdmin') {
+                // FEMSAdmin can see all individual clients
+                $clients = DB::table('individual_clients')
+                    ->join('clients', 'individual_clients.client_id', '=', 'clients.id')
+                    ->select('clients.*', 'individual_clients.first_name', 'individual_clients.last_name', 'individual_clients.address', 'individual_clients.gps_address')
+                    ->get();
+            } else {
+                // Other users can only see individual clients they created
+                $clients = DB::table('individual_clients')
+                    ->join('clients', 'individual_clients.client_id', '=', 'clients.id')
+                    ->where('clients.created_by', $user->id)
+                    ->where('clients.created_by_type', $userType) // Filter by user type
+                    ->select('clients.*', 'individual_clients.first_name', 'individual_clients.last_name', 'individual_clients.address', 'individual_clients.gps_address')
+                    ->get();
+            }
+    
+            return response()->json([
+                'message' => 'Individual clients retrieved successfully',
+                'clients' => $clients,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error in getClientByIndividual method', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'An error occurred'], 500);
+        }
+    }
+    
 }

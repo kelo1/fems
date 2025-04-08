@@ -17,15 +17,27 @@ class Client extends Model
         'client_type',
         'OTP',
         'email_token',
+         'created_by',
+        'created_by_type',
+        'sms_verified',
+        'email_verified_at',
     ];
 
     protected $hidden = [
         'password',
     ];
+    public function creator()
+    {
+        // Assuming you have a User model and a 'created_by' column in the clients table
+        // that references the id of the user who created the client.
+        
+    return $this->belongsTo(User::class, 'created_by');
 
+    }
+    
     public function customerType()
     {
-        return $this->hasOne(CustomerType::class);
+        return $this->belongsTo(CustomerType::class);
     }
 
     public function individualClient()
@@ -33,7 +45,7 @@ class Client extends Model
         return $this->hasOne(Individual_clients::class, 'client_id');
     }
 
-    public function corporateClient()
+    public function corporateDetails()
     {
         return $this->hasOne(Corporate_clients::class, 'client_id');
     }

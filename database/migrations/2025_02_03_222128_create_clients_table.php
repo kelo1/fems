@@ -24,6 +24,9 @@ return new class extends Migration
             $table->boolean('sms_verified')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->timestamps();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->string('created_by_type')->nullable(); // Store the type of user who created the client
+
         });
     }
 
