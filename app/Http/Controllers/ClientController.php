@@ -587,91 +587,191 @@ class ClientController extends Controller
     }
     // Get all corporate clients filtered by user type
     // This method retrieves corporate clients based on the user type (FEMSAdmin or other users)
-
-    public function getClientByCorporateType($corporateTypeId)
+    public function getClientByCorporateType(Request $request)
     {
         try {
-            \Log::info('getClientsByCorporateType method called', ['corporate_type_id' => $corporateTypeId]);
-
+            \Log::info('getClientsByCorporateType method called', $request->all());
+    
             // Authenticate the user
             $user = Auth::user();
-
             if (!$user) {
                 return response(['message' => 'Unauthorized'], 403);
             }
-
-            // Check if the CorporateType exists
-            $corporateType = CorporateType::find($corporateTypeId);
-
+    
+            // Validate the request
+            $request->validate([
+                'corporate_type_id' => 'required|exists:corporate_types,id',
+                'user_type' => 'sometimes|string|in:SERVICE_PROVIDER,FSA_AGENT,GRA_PERSONNEL',
+                'user_id' => 'sometimes|integer',
+            ]);
+    
+            $corporate_type_id = $request->corporate_type_id;
+            $rawUserType = $request->user_type ?? null;
+            $userId = $request->user_id ?? null;
+    
+            // Resolve and map user_type to model class name
+            $mappedUserType = null;
+            if ($rawUserType) {
+                $mappedUserType = $this->resolveModelUserType($rawUserType);
+                \Log::info('Mapped User Type:', ['from' => $rawUserType, 'to' => $mappedUserType]);
+            }
+    
+            // Fetch the corporate type
+            $corporateType = CorporateType::find($corporate_type_id);
             if (!$corporateType) {
                 return response()->json(['message' => 'Corporate type not found'], 404);
             }
-
-            // Check user type
-            $userType = get_class($user);
-
-            if ($userType === 'App\Models\FEMSAdmin') {
-                // FEMSAdmin can see all clients
-                $clients = DB::table('corporate_clients')
-                    ->join('clients', 'corporate_clients.client_id', '=', 'clients.id')
-                    ->where('corporate_clients.corporate_type_id', $corporateTypeId)
-                    ->select('clients.*', 'corporate_clients.corporate_type_id')
-                    ->get();
+    
+            // Determine authenticated user type
+            $authenticatedUserType = get_class($user);
+    
+            // Base query
+            $query = DB::table('corporate_clients')
+                ->join('clients', 'corporate_clients.client_id', '=', 'clients.id')
+                ->where('corporate_clients.corporate_type_id', $corporate_type_id);
+    
+            if ($authenticatedUserType === 'App\Models\FEMSAdmin') {
+                // FEMSAdmin can see all, with optional filters
+                if ($mappedUserType) {
+                    $query->where('clients.created_by_type', 'App\Models\\' . $mappedUserType);
+                }
+    
+                if ($userId) {
+                    $query->where('clients.created_by', $userId);
+                }
             } else {
-                // Other users can only see clients they created
-                $clients = DB::table('corporate_clients')
-                    ->join('clients', 'corporate_clients.client_id', '=', 'clients.id')
-                    ->where('corporate_clients.corporate_type_id', $corporateTypeId)
-                    ->where('clients.created_by', $user->id)
-                    ->where('clients.created_by_type', $userType) // Filter by user type
-                    ->select('clients.*', 'corporate_clients.corporate_type_id')
-                    ->get();
+                // Other users only see their own clients
+                $query->where('clients.created_by', $user->id)
+                      ->where('clients.created_by_type', $authenticatedUserType);
+    
+                // Apply user_type and user_id filters only if they match the current user
+                if ($mappedUserType && $authenticatedUserType === 'App\Models\\' . $mappedUserType) {
+                    $query->where('clients.created_by_type', 'App\Models\\' . $mappedUserType);
+                }
+    
+                if ($userId && $userId === $user->id) {
+                    $query->where('clients.created_by', $userId);
+                }
             }
-
+    
+            $clients = $query->select(
+                'clients.id as client_id',
+                'clients.email',
+                'clients.phone',
+                'clients.client_type',
+                'clients.created_by',
+                'clients.created_by_type',
+                'corporate_clients.company_name',
+                'corporate_clients.company_address',
+                'corporate_clients.company_email',
+                'corporate_clients.company_phone',
+                'corporate_clients.certificate_of_incorporation',
+                'corporate_clients.gps_address',
+                'corporate_clients.corporate_type_id'
+            )->get();
+    
             return response()->json([
                 'message' => 'Clients retrieved successfully',
                 'corporate_type' => $corporateType->name,
                 'clients' => $clients,
             ], 200);
+    
         } catch (\Exception $e) {
             \Log::error('Error in getClientsByCorporateType method', ['error' => $e->getMessage()]);
             return response()->json(['message' => 'An error occurred'], 500);
         }
     }
+    
+
+    private function resolveModelUserType($type)
+    {
+        $map = [
+            'SERVICE_PROVIDER' => 'ServiceProvider',
+            'FSA_AGENT' => 'FSA_Agent',
+            'GRA_PERSONNEL' => 'GRA_Personnel',
+        ];
+
+        return $map[strtoupper($type)] ?? null;
+    }
 
     // Get all individual clients filtered by user type
     // This method retrieves individual clients based on the user type (FEMSAdmin or other users)
-    public function getClientByIndividual()
+    public function getClientByIndividual(Request $request)
     {
         try {
-            \Log::info('getClientByIndividual method called');
-    
+            \Log::info('getClientByIndividual method called', $request->all());
+
             // Authenticate the user
             $user = Auth::user();
-    
+
             if (!$user) {
                 return response(['message' => 'Unauthorized'], 403);
             }
-    
-            // Check user type
-            $userType = get_class($user);
-    
-            if ($userType === 'App\Models\FEMSAdmin') {
-                // FEMSAdmin can see all individual clients
-                $clients = DB::table('individual_clients')
-                    ->join('clients', 'individual_clients.client_id', '=', 'clients.id')
-                    ->select('clients.*', 'individual_clients.first_name', 'individual_clients.last_name', 'individual_clients.address', 'individual_clients.gps_address')
-                    ->get();
+
+            // Validate the request
+            $request->validate([
+                'user_type' => 'sometimes|string|in:SERVICE_PROVIDER,FSA_AGENT,GRA_PERSONNEL',
+                'user_id' => 'sometimes|integer',
+            ]);
+
+            $rawUserType = $request->user_type ?? null;
+            $userId = $request->user_id ?? null;
+
+            // Resolve and map user_type to model class name
+            $mappedUserType = null;
+            if ($rawUserType) {
+                $mappedUserType = $this->resolveModelUserType($rawUserType);
+                \Log::info('Mapped User Type:', ['from' => $rawUserType, 'to' => $mappedUserType]);
+            }
+
+            // Determine authenticated user type
+            $authenticatedUserType = get_class($user);
+
+            // Base query
+            $query = DB::table('individual_clients')
+                ->join('clients', 'individual_clients.client_id', '=', 'clients.id');
+
+            if ($authenticatedUserType === 'App\Models\FEMSAdmin') {
+                // FEMSAdmin can see all individual clients, with optional filters
+                if ($mappedUserType) {
+                    $query->where('clients.created_by_type', 'App\Models\\' . $mappedUserType);
+                }
+
+                if ($userId) {
+                    $query->where('clients.created_by', $userId);
+                }
             } else {
                 // Other users can only see individual clients they created
-                $clients = DB::table('individual_clients')
-                    ->join('clients', 'individual_clients.client_id', '=', 'clients.id')
-                    ->where('clients.created_by', $user->id)
-                    ->where('clients.created_by_type', $userType) // Filter by user type
-                    ->select('clients.*', 'individual_clients.first_name', 'individual_clients.last_name', 'individual_clients.address', 'individual_clients.gps_address')
-                    ->get();
+                $query->where('clients.created_by', $user->id)
+                    ->where('clients.created_by_type', $authenticatedUserType);
+
+                // Apply user_type and user_id filters only if they match the current user
+                if ($mappedUserType && $authenticatedUserType === 'App\Models\\' . $mappedUserType) {
+                    $query->where('clients.created_by_type', 'App\Models\\' . $mappedUserType);
+                }
+
+                if ($userId && $userId === $user->id) {
+                    $query->where('clients.created_by', $userId);
+                }
             }
-    
+
+            // Select fields from both tables
+            $clients = $query->select(
+                'clients.id as client_id',
+                'clients.email',
+                'clients.phone',
+                'clients.client_type',
+                'clients.created_by',
+                'clients.created_by_type',
+                'individual_clients.first_name',
+                'individual_clients.middle_name',
+                'individual_clients.last_name',
+                'individual_clients.address',
+                'individual_clients.gps_address',
+                'individual_clients.document_type',
+                'individual_clients.document'
+            )->get();
+
             return response()->json([
                 'message' => 'Individual clients retrieved successfully',
                 'clients' => $clients,
