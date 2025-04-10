@@ -597,13 +597,19 @@ class ClientController extends Controller
             if (!$user) {
                 return response(['message' => 'Unauthorized'], 403);
             }
-    
+
+            if(!$request->has('corporate_type_id')) {
+                return response()->json(['message' => 'Corporate type ID is required'], 400);
+            }
+
             // Validate the request
             $request->validate([
                 'corporate_type_id' => 'required|exists:corporate_types,id',
                 'user_type' => 'sometimes|string|in:SERVICE_PROVIDER,FSA_AGENT,GRA_PERSONNEL',
                 'user_id' => 'sometimes|integer',
             ]);
+
+            // Extract parameters from the request
     
             $corporate_type_id = $request->corporate_type_id;
             $rawUserType = $request->user_type ?? null;
@@ -687,8 +693,8 @@ class ClientController extends Controller
     {
         $map = [
             'SERVICE_PROVIDER' => 'ServiceProvider',
-            'FSA_AGENT' => 'FSA_Agent',
-            'GRA_PERSONNEL' => 'GRA_Personnel',
+            'FSA_AGENT' => 'FireServiceAgent',
+            'GRA_PERSONNEL' => 'GRA',
         ];
 
         return $map[strtoupper($type)] ?? null;

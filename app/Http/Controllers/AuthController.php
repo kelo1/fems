@@ -25,9 +25,6 @@ class AuthController extends Controller
          if (!$admin) {
              return response()->json(['message' => 'Unauthorized: Admin user not found'], 401);
          }
- 
-         // Get the authenticated user
-         $admin = Auth::user();
      
          // Ensure the authenticated user is a FEMSAdmin
          if (!$admin instanceof FEMSAdmin) {
