@@ -67,6 +67,7 @@ class CorporateClientsController extends Controller
         //Validate Corporate client details    
         $request->validate([
             'company_name' => 'required|string|max:255',
+            'branch_name' => 'sometimes|string|max:255',
             'company_address' => 'required|string|max:255',
             'company_email' => 'sometimes|string|max:255',
             'company_phone' => 'sometimes|string|max:15',
@@ -84,6 +85,7 @@ class CorporateClientsController extends Controller
         try {
             DB::table('corporate_clients')->insert([
                 'company_name' => $request->company_name,
+                'branch_name' => $request->branch_name ?? 'No branch name',
                 'company_address' => $request->company_address,
                 'company_email' => $request->company_email ?? $company_email,
                 'company_phone' => $request->company_phone ?? $company_phone,

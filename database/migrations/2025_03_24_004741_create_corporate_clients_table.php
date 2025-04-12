@@ -16,6 +16,7 @@ return new class extends Migration
         Schema::create('corporate_clients', function (Blueprint $table) {
             $table->id();
             $table->string('company_name');
+            $table->string('branch_name')->default('No Branch Name');
             $table->string('company_email');
             $table->string('company_phone');
             $table->string('company_address');

@@ -145,6 +145,7 @@ class ClientController extends Controller
             'message' => 'Corporate Client created Successfully',
             'client_id' => $itemId,
                     'company_name' => $corporate_details->company_name,
+                    'branch_name' => $corporate_details->branch_name,
                     'company_address' => $corporate_details->company_address,
                     'company_email' => $corporate_details->company_email,
                     'certificate_of_incorporation' => $corporate_details->certificate_of_incorporation,
@@ -254,6 +255,7 @@ class ClientController extends Controller
                             'client_id' => $client_id,
                             'company_name' => $client['company_name'],
                             'company_address' => $client['company_address'],
+                            'branch_name' => $client['branch_name'] ?? null,
                             'company_email' => $client['company_email'] ?? $client['email'],
                             'company_phone' => $client['company_phone'] ?? $client['phone'],
                             'certificate_of_incorporation' => $client['certificate_of_incorporation'] ?? null,
@@ -334,6 +336,7 @@ class ClientController extends Controller
             $rules += [
                 'company_name' => 'sometimes|string',
                 'company_address' => 'sometimes|string',
+                'branch_name' => 'sometimes|string',
                 'company_email' => 'sometimes|email',
                 'company_phone' => 'sometimes|string',
                 'certificate_of_incorporation' => 'nullable|string',
@@ -383,7 +386,7 @@ class ClientController extends Controller
                 $corporateUpdates = array_intersect_key($validatedData, array_flip([
                     'company_name', 'company_address', 'company_email', 
                     'company_phone', 'certificate_of_incorporation', 
-                    'company_registration', 'corporate_type_id', 'gps_address' // 🔥 INCLUDED HERE
+                    'branch_name','company_registration', 'corporate_type_id', 'gps_address' // 🔥 INCLUDED HERE
                 ]));
 
                 if (!empty($corporateUpdates)) {

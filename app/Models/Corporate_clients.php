@@ -11,6 +11,7 @@ class Corporate_clients extends Model
 
     protected $fillable = [
         'company_name',
+        'branch_name',
         'company_address',
         'company_email',
         'company_phone',
