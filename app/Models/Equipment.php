@@ -20,6 +20,8 @@ class Equipment extends Model
         'expiry_date',
         'serial_number',
         'isActive',
+        'created_by',
+        'created_by_type',
     ];
 
     protected static function boot()
@@ -44,5 +46,17 @@ class Equipment extends Model
     public function qrCode()
     {
         return $this->hasOne(QRCode::class, 'serial_number', 'serial_number');
+    }
+
+    // Relationship with EquipmentClient
+    public function equipmentClients()
+    {
+        return $this->hasMany(EquipmentClient::class);
+    }
+
+    // Relationship with EquipmentServiceProvider
+    public function equipmentServiceProviders()
+    {
+        return $this->hasMany(EquipmentServiceProvider::class);
     }
 }

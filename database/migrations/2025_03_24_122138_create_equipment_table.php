@@ -23,6 +23,8 @@ return new class extends Migration
             $table->date('date_of_manufacturing');
             $table->date('expiry_date');
             $table->boolean('isActive')->default(false);
+             $table->unsignedBigInteger('created_by')->nullable();
+            $table->string('created_by_type')->nullable(); // Store the type of user who created the equipment
             $table->timestamps();
             $table->foreign('service_provider_id')->references('id')->on('service_providers')->onDelete('set null');
             $table->foreign('client_id')->references('id')->on('clients')->onDelete('set null');

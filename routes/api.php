@@ -128,12 +128,16 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::get('/equipment/client/{client_id}', [EquipmentController::class, 'getEquipmentByClient'])->name('equipment_by_client');
   Route::get('/equipment/check_expired', [EquipmentController::class, 'checkExpiredEquipment'])->name('checkExpiredEquipment');
   Route::get('/equipment/check_expiring_soon', [EquipmentController::class, 'checkExpiringSoonEquipment'])->name('checkExpiringSoonEquipment');
+  Route::post('/equipment/updateClientOrServiceProvider/{equipment_id}', [EquipmentController::class, 'updateClientOrServiceProvider'])->name('updateClientOrServiceProvider');
+  Route::get('/equipment/details/{id}', [EquipmentController::class, 'getEquipmentByID'])->name('equipment_details');
+  Route::get('/equipment/serial_number/{serial_number}', [EquipmentController::class, 'getEquipmentBySerialNumber'])->name('equipment_by_serial_number');
 
   //Protected QR Code Routes
   Route::post('/qrcode/generate/{serial_number}', [QRCodeController::class, 'generateQrCode'])->name('generate_qr_code');
   Route::put('/qrcode/update/{serial_number}', [QRCodeController::class, 'updateQrCode'])->name('decode_qr_code');
   Route::get('/qrcode/decode/{serial_number}', [QRCodeController::class, 'decodeQrCode'])->name('auth:sanctum');
 
+  
   //Protected User Type Routes
   Route::post('/user_type/create', [UserTypeController::class, 'store'])->name('user_type_store');
   Route::delete('/user_type/delete/{id}', [UserTypeController::class, 'destroy'])->name('user_type_delete');
