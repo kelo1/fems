@@ -17,6 +17,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\GRAController;
 use App\Http\Controllers\UserTypeController;
 use App\Http\Controllers\LicenseTypeController;
+use App\Http\Controllers\CorporateTypeController;
 
 
 /*
@@ -56,6 +57,10 @@ Route::get('user_type/all', [UserTypeController::class, 'index'])->name('user_ty
 
 // License Type Routes
 Route::get('license_type/all', [LicenseTypeController::class, 'index'])->name('license_type_index');
+
+// Corporate Type Routes
+Route::get('corporate_type/all', [CorporateTypeController::class, 'index'])->name('corporate_type_index');
+
 
 // Validate User Phone Number and Email Routes
 Route::post('/user/validate_email', [AuthController::class, 'validateEmail'])->name('validate_email');
