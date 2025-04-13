@@ -18,6 +18,8 @@ use App\Http\Controllers\GRAController;
 use App\Http\Controllers\UserTypeController;
 use App\Http\Controllers\LicenseTypeController;
 use App\Http\Controllers\CorporateTypeController;
+use App\Http\Controllers\BillingController;
+use App\Http\Controllers\CustomerTypeController;
 
 
 /*
@@ -61,6 +63,8 @@ Route::get('license_type/all', [LicenseTypeController::class, 'index'])->name('l
 // Corporate Type Routes
 Route::get('corporate_type/all', [CorporateTypeController::class, 'index'])->name('corporate_type_index');
 
+// Customer Type Routes
+Route::get('customer_type/all', [CustomerTypeController::class, 'index'])->name('customer_type_index');
 
 // Validate User Phone Number and Email Routes
 Route::post('/user/validate_email', [AuthController::class, 'validateEmail'])->name('validate_email');
@@ -81,7 +85,8 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::post('/user/show_by_user_type', [AuthController::class, 'showbyUserType'])->name('user_show');
   
   //Protected Client Routes
-  Route::post('client/fems/register', [ClientController::class, 'store'])->name('register_client');
+  Route::post('/client/create_corporate_client', [ClientController::class, 'createCorporateClient'])->name('register_corporate_client');
+  Route::post('/client/create_individual_client', [ClientController::class, 'createIndividualClient'])->name('register_individual_client');
   Route::get('/client/all', [ClientController::class, 'index'])->name('all_clients');
   Route::post('/client/bulk_upload', [ClientController::class, 'bulkUpload'])->name('upload_clients');
   Route::put('/client/update_client/{id}', [ClientController::class, 'update'])->name('update_client');
@@ -90,7 +95,9 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::post('/client/getclientbycorporatetype/', [ClientController::class, 'getClientByCorporateType'])->name('clients_by_corporate_type');
   Route::post('/client/getClientByIndividual/', [ClientController::class, 'getClientByIndividual'])->name('clients_by_individual_type');
   Route::post('/client/logout', [ClientController::class, 'logout'])->name('client_logout'); 
-
+  Route::get('/client/uploads/{id}', [ClientController::class, 'getClientUploads'])->name('client_uploads');
+  Route::delete('/client/delete_upload/{id}', [ClientController::class, 'deleteClientUpload'])->name('delete_client_upload');
+  
   //Protected Corporate Client Routes
   Route::get('/client/corporate_clients', [CorporateClientsController::class, 'getCorporateClients'])->name('all_corporate_clients');
   Route::get('/client/corporate_clients/{id}', [CorporateClientsController::class, 'getCorporateClientByID'])->name('corporate_client_by_id');  
@@ -150,6 +157,17 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   //Protected License Type Routes
   Route::post('/license_type/create', [LicenseTypeController::class, 'store'])->name('license_type_store');
   Route::delete('/license_type/delete/{id}', [LicenseTypeController::class, 'destroy'])->name('license_type_delete');
+
+  //Protected Billing Routes
+  Route::get('/billing/service_provider/{serviceProviderId}', [BillingController::class, 'billingByServiceProvider'])->name('billing_by_service_provider');
+  Route::post('/billing/create', [BillingController::class, 'store'])->name('setup_billing');
+  Route::put('/billing/update/{id}', [BillingController::class, 'update'])->name('update_billing_items');
+  Route::post('/billing/delete', [BillingController::class, 'destroy'])->name('delete_billing_items');
+  Route::get('/billing/show/{id}', [BillingController::class, 'show'])->name('show_billitem');
+  Route::get('/billing/activebills', [BillingController::class, 'ActiveBillItems'])->name('active_billing');
+  Route::get('/billing/search/{search}', [BillingController::class, 'search'])->name('search_billitems');
+  
+
 });
 
 // Route::middleware('auth:sanctum')->get('/user', function (Request $request) {

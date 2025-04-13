@@ -46,94 +46,105 @@ class CorporateClientsController extends Controller
         $corporateClient = Corporate_clients::with('client', 'corporateType')->where('client_id', $id)->first();
         return response()->json($corporateClient);
     }
+    
+    public function generateOTP()
+    {
+        do {
+            $otp = random_int(100000, 999999);
+        } while (Client::where("otp", "=", $otp)->first());
+
+        return $otp;
+    }
 
     //Store Corporate client details
     public function store(Request $request)
-    { 
-        $client_id = $request->client_id;
-        $company_email = $request->email;   
-        $company_phone = $request->phone;
+    {
+        $user = Auth::user();
 
-        // Log the initial request data
-        Log::info('Corporate client store method called', $request->all());
-
-        //Check if the Company exists
-        $check_corporate_client = Corporate_clients::where('id', $client_id)->first();
-
-        if ($check_corporate_client) {
-            return response()->json(['message' => 'Corporate client already exist'], 404);
+        if (!$user) {
+            return response(['message' => 'Unauthorized'], 403);
         }
 
-        //Validate Corporate client details    
+        // Validate client details and file uploads
         $request->validate([
+            'email' => 'required|email|unique:clients,email',
+            'phone' => 'required|string|max:15|unique:clients,phone',
+            'client_type' => 'required|string|exists:customer_types,name',
             'company_name' => 'required|string|max:255',
             'branch_name' => 'sometimes|string|max:255',
             'company_address' => 'required|string|max:255',
-            'company_email' => 'sometimes|string|max:255',
-            'company_phone' => 'sometimes|string|max:15',
-            'certificate_of_incorporation' => 'nullable|string|max:255',           
-            'company_registration' => 'nullable|string|max:255',
+            'certificate_of_incorporation' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
+            'company_registration' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
             'gps_address' => 'nullable|string|max:255',
-            'client_id' => 'required|integer|unique:corporate_clients,client_id',
             'corporate_type_id' => 'required|integer|exists:corporate_types,id',
         ]);
 
-        // Log the validated request data
-        Log::info('Corporate client request data validated', $request->all());
-        
-        //Store corporate client details
         try {
-            DB::table('corporate_clients')->insert([
+            \DB::beginTransaction();
+
+            $otp = $this->generateOTP();
+            $email_verification = Str::uuid()->toString();
+
+            // Create the client
+            $client = Client::create([
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'password' => Hash::make(Str::random(8)), // Generate a random password
+                'client_type' => $request->client_type,
+                'OTP' => $otp,
+                'email_token' => $email_verification,
+                'created_by' => $user->id,
+                'created_by_type' => get_class($user), // Store the type of user who created the client
+            ]);
+
+            // Log the creation of the client
+            Log::info('Client details stored', ['client_id' => $client->id]);
+
+            // check if client_type is corporate
+            if ($request->client_type !== 'CORPORATE') {
+                \DB::rollBack();
+                return response()->json(['message' => 'Client type must be corporate'], 422);
+            }
+
+            // Handle file uploads
+            $certificateFileName = null;
+            $registrationFileName = null;
+
+            if ($request->hasFile('certificate_of_incorporation')) {
+                $certificateFile = $request->file('certificate_of_incorporation');
+                $certificateFileName = 'certificate_' . $client->id . '_' . Str::slug($request->company_name) . '_' . now()->format('YmdHis') . '.' . $certificateFile->getClientOriginalExtension();
+                $certificateFile->storeAs('uploads/corporate_clients', $certificateFileName, 'public');
+            }
+
+            if ($request->hasFile('company_registration')) {
+                $registrationFile = $request->file('company_registration');
+                $registrationFileName = 'registration_' . $client->id . '_' . Str::slug($request->company_name) . '_' . now()->format('YmdHis') . '.' . $registrationFile->getClientOriginalExtension();
+                $registrationFile->storeAs('uploads/corporate_clients', $registrationFileName, 'public');
+            }
+
+            // Store corporate client details
+            Corporate_clients::create([
                 'company_name' => $request->company_name,
                 'branch_name' => $request->branch_name ?? 'No branch name',
                 'company_address' => $request->company_address,
-                'company_email' => $request->company_email ?? $company_email,
-                'company_phone' => $request->company_phone ?? $company_phone,
-                'certificate_of_incorporation'=> $request->certificate_of_incorporation ?? 'No upload',
-                'company_registration'=> $request->company_registration ?? 'No upload',
+                'company_email' => $request->email,
+                'company_phone' => $request->phone,
+                'certificate_of_incorporation' => $certificateFileName ?? 'No upload',
+                'company_registration' => $registrationFileName ?? 'No upload',
                 'gps_address' => $request->gps_address,
                 'corporate_type_id' => $request->corporate_type_id,
-                'client_id' => $client_id,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
+                'client_id' => $client->id,
             ]);
 
-            Log::info('Corporate client details inserted', ['client_id' => $client_id]);
+            Log::info('Corporate client details stored', ['client_id' => $client->id]);
 
-            //Check if document type is certificate of incorporation
-            if($request->hasFile('file') && $request->certificate_of_incorporation){
-                $file = $request->file('file');
-                $filePath = $client_id.'/' . 'certificate_of_incorporation_upload_' . Carbon::now()->toDateTimeString().'_'.$file->getClientOriginalName();
-                Storage::disk('s3')->put($filePath, file_get_contents($file));
-
-                DB::table('corporate_clients')
-                ->where('client_id', $client_id)
-                ->update([
-                    'certificate_of_incorporation' =>$filePath
-                ]);
-
-                Log::info('Certificate of incorporation uploaded', ['filePath' => $filePath]);
-            }
-
-            //Check if document type is business registration
-            if($request->hasFile('file') && $request->company_registration){
-                $file = $request->file('file');
-                $filePath = $client_id.'/' . 'company_registration_upload_' . Carbon::now()->toDateTimeString().'_'.$file->getClientOriginalName();
-                Storage::disk('s3')->put($filePath, file_get_contents($file));
-
-                DB::table('corporate_clients')
-                ->where('client_id', $client_id)
-                ->update([
-                    'company_registration' =>$filePath
-                ]);
-
-                Log::info('Company registration uploaded', ['filePath' => $filePath]);
-            }    
+            \DB::commit();
 
             return response()->json(['message' => 'Corporate client created successfully'], 201);
-        } catch (Exception $e) {
-            Log::error('Failed to create corporate client details', ['error' => $e->getMessage()]);
-            return response()->json(['message' => 'Failed to create corporate client details'], 500);
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            Log::error('Failed to create corporate client', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to create corporate client'], 500);
         }
     }
 }

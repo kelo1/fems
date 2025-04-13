@@ -39,132 +39,18 @@ class ClientController extends Controller
         return $otp;
     }
 
-    // Store a newly created resource in storage
-    public function store(Request $request)
+
+    public function createCorporateClient(Request $request)
     {
-        \Log::info('ClientController store method called', $request->all());
+    $corporateClientsController = new CorporateClientsController();
+    return $corporateClientsController->store($request);
 
-        $user = Auth::user();
+    }
 
-        if (!$user) {
-            return response(['message' => 'Unauthorized'], 403);
-        }
-        
-        // Validate request
-        $request->validate([
-            'email' => 'required|string|email|unique:clients,email',
-            'phone' => 'required|string|unique:clients,phone',
-            'client_type' => 'required|string',
-        ]);
-
-        // Generate a random password
-        $randomPassword = Str::random(12);
-
-        // Generate OTP and email verification token
-        $otp = $this->generateOTP();
-        $email_verification = Str::uuid()->toString();
-
-        // Create the client
-        $client = Client::create([
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'password' => Hash::make($randomPassword),
-            'client_type' => $request->client_type,
-            'OTP' => $otp,
-            'email_token' => $email_verification,
-            'created_by' => $user->id, 
-            'created_by_type' => get_class($user), // Store the type of user who created the client
-
-        ]);
-
-
-// Check if client was created
-        if (!$client) {
-            \Log::error('Client creation failed');
-            return response(['message' => 'Client creation failed'], 500);
-        }
-
-// Get the last inserted item
-        $itemId = DB::getPdo()->lastInsertId();
-        \Log::info('Client created with ID', ['client_id' => $itemId]);
-
-        // Get email and phone number
-        $client_email = Client::where('id', $itemId)->value('email');
-        $client_phone = Client::where('id', $itemId)->value('phone');
-
-        $client_id = $itemId;
-        $client_type = Client::where('id', $client_id)->value('client_type');
-
-        // Check if client type is individual or corporate
-        if (strtoupper($client_type) == 'INDIVIDUAL') {
-            // Store individual client
-            $request->merge(['client_id' => $client_id]);
-            try {
-                app('App\Http\Controllers\IndividualClientsController')->store($request);
-
-                $individual_details = DB::table('individual_clients')->where('client_id', $client_id)->first();
-
-                if (!$individual_details) {
-                    \Log::error('Failed to create individual client details', ['client_id' => $client_id]);
-                    throw new \Exception('Failed to create individual client details, client already exists');
-                }
-
-                $response = [
-                    'message' => 'Individual Client created Successfully',
-                    'client_id' => $itemId,
-                    'email' => $client->email,
-                    'first_name' => $individual_details->first_name,
-                    'middle_name' => $individual_details->middle_name,
-                    'last_name' => $individual_details->last_name,
-                    'phone' => $client->phone,
-                    'address' => $individual_details->address,
-                    'gps_address' => $individual_details->gps_address,
-                    'client_type' => $client->client_type,
-                ];
-
-                return response($response, 201);
-            } catch (\Exception $e) {
-                \Log::error('Failed to create individual client details, deleting client', ['client_id' => $client_id, 'error' => $e->getMessage()]);
-                Client::where('id', $client_id)->delete();
-                return response(['message' => 'Failed to create individual client details, client not created'], 500);
-            }
-        } elseif (strtoupper($client_type) == 'CORPORATE') {
-            // Store Corporate client details
-            $request->merge(['client_id' => $client_id, 'email' => $client_email, 'phone' => $client_phone]);
-            try {
-                app('App\Http\Controllers\CorporateClientsController')->store($request);
-
-                $corporate_details = DB::table('corporate_clients')->where('client_id', $client_id)->first();
-
-                if (!$corporate_details) {
-                    \Log::error('Failed to create corporate client details', ['client_id' => $client_id]);
-                    throw new \Exception('Failed to create corporate client details');
-                }
-
-                $response = [
-            'message' => 'Corporate Client created Successfully',
-            'client_id' => $itemId,
-                    'company_name' => $corporate_details->company_name,
-                    'branch_name' => $corporate_details->branch_name,
-                    'company_address' => $corporate_details->company_address,
-                    'company_email' => $corporate_details->company_email,
-                    'certificate_of_incorporation' => $corporate_details->certificate_of_incorporation,
-                    'gps_address' => $corporate_details->gps_address,
-                    'phone' => $client->phone,
-                    'corporate_type_id' => $corporate_details->corporate_type_id,
-                    'client_type' => $client->client_type,
-                ];
-
-                return response($response, 201);
-            } catch (\Exception $e) {
-                \Log::error('Failed to create corporate client details, deleting client', ['client_id' => $client_id, 'error' => $e->getMessage()]);
-                Client::where('id', $client_id)->delete();
-                return response(['message' => 'Failed to create corporate client details, client not created'], 500);
-            }
-        } else {
-            \Log::error('The set customer type does not exist', ['client_type' => $client_type]);
-            return response(["Message" => "The set customer type does not exist"], 404);
-        }
+    public function createIndividualClient(Request $request)
+    {
+        $individualClientsController = new IndividualClientsController();
+        return $individualClientsController->store($request);
     }
 
     // Bulk upload clients
@@ -329,8 +215,9 @@ class ClientController extends Controller
                 'last_name' => 'sometimes|string',
                 'address' => 'sometimes|string',
                 'gps_address' => 'nullable|string',
-                'document_type' => 'sometimes|string',
-                'document' => 'sometimes|string',
+                'document_type' => 'sometimes|string|in:PASSPORT,NATIONAL_ID',
+                'document' => 'required_if:document_type,PASSPORT,NATIONAL_ID|file|mimes:pdf,jpg,jpeg,png|max:2048',
+    
             ];
         } elseif ($isCorporate) {
             $rules += [
@@ -339,8 +226,8 @@ class ClientController extends Controller
                 'branch_name' => 'sometimes|string',
                 'company_email' => 'sometimes|email',
                 'company_phone' => 'sometimes|string',
-                'certificate_of_incorporation' => 'nullable|string',
-                'company_registration' => 'nullable|string',
+                'certificate_of_incorporation' => 'sometimes|file|mimes:pdf,jpg,jpeg,png|max:2048',
+                'company_registration' => 'sometimes|file|mimes:pdf,jpg,jpeg,png|max:2048',
                 'corporate_type_id' => 'sometimes|exists:corporate_types,id',
                 'gps_address' => 'nullable|string', 
             ];
@@ -353,7 +240,7 @@ class ClientController extends Controller
             return response()->json(['message' => 'No valid data provided for update'], 400);
         }
 
-        DB::transaction(function () use ($client, $validatedData, $isIndividual, $isCorporate) {
+        DB::transaction(function () use ($client, $validatedData, $isIndividual, $isCorporate, $request) {
             // Update client main table
             if (!empty($validatedData['password'])) {
                 $validatedData['password'] = Hash::make($validatedData['password']);
@@ -374,6 +261,14 @@ class ClientController extends Controller
                     'gps_address', 'document_type', 'document'
                 ]));
 
+                // Handle document upload for individual clients
+                if ($request->hasFile('document')) {
+                    $documentFile = $request->file('document');
+                    $documentFileName = strtolower($validatedData['document_type']) . '_upload_' . $client->id . '_' . now()->format('YmdHis') . '.' . $documentFile->getClientOriginalExtension();
+                    $documentFile->storeAs('uploads/individual_clients', $documentFileName, 'public');
+                    $individualUpdates['document'] = $documentFileName;
+                }
+
                 if (!empty($individualUpdates)) {
                     DB::table('individual_clients')
                         ->where('client_id', $client->id)
@@ -384,10 +279,26 @@ class ClientController extends Controller
                 }
             } elseif ($isCorporate) {
                 $corporateUpdates = array_intersect_key($validatedData, array_flip([
-                    'company_name', 'company_address', 'company_email', 
-                    'company_phone', 'certificate_of_incorporation', 
-                    'branch_name','company_registration', 'corporate_type_id', 'gps_address' // 🔥 INCLUDED HERE
+                    'company_name', 'company_address', 'company_email',
+                    'company_phone', 'certificate_of_incorporation',
+                    'branch_name', 'company_registration', 'corporate_type_id', 'gps_address'
                 ]));
+
+                // Handle certificate_of_incorporation upload for corporate clients
+                if ($request->hasFile('certificate_of_incorporation')) {
+                    $certificateFile = $request->file('certificate_of_incorporation');
+                    $certificateFileName = 'certificate_' . $client->id . '_' . now()->format('YmdHis') . '.' . $certificateFile->getClientOriginalExtension();
+                    $certificateFile->storeAs('uploads/corporate_clients', $certificateFileName, 'public');
+                    $corporateUpdates['certificate_of_incorporation'] = $certificateFileName;
+                }
+
+                // Handle company_registration upload for corporate clients
+                if ($request->hasFile('company_registration')) {
+                    $registrationFile = $request->file('company_registration');
+                    $registrationFileName = 'registration_' . $client->id . '_' . now()->format('YmdHis') . '.' . $registrationFile->getClientOriginalExtension();
+                    $registrationFile->storeAs('uploads/corporate_clients', $registrationFileName, 'public');
+                    $corporateUpdates['company_registration'] = $registrationFileName;
+                }
 
                 if (!empty($corporateUpdates)) {
                     DB::table('corporate_clients')
@@ -790,5 +701,142 @@ class ClientController extends Controller
             return response()->json(['message' => 'An error occurred'], 500);
         }
     }
-    
+
+    public function getClientUploads($id)
+    {
+        // Authenticate user
+        $user = Auth::user();
+
+        if (!$user) {
+            return response(['message' => 'Unauthorized'], 403);
+        }
+
+        // Find the client
+        $client = Client::find($id);
+
+        if (!$client) {
+            return response()->json(['message' => 'Client not found'], 404);
+        }
+
+        // Determine client type
+        $clientType = strtoupper($client->client_type);
+
+        if ($clientType === 'INDIVIDUAL') {
+            // Fetch uploads for individual clients
+            $individualClient = Individual_clients::where('client_id', $id)->first();
+
+            if (!$individualClient) {
+                return response()->json(['message' => 'Individual client details not found'], 404);
+            }
+
+            return response()->json([
+                'message' => 'Individual client uploads retrieved successfully',
+                'uploads' => [
+                    'document_type' => $individualClient->document_type,
+                    'document' => $individualClient->document ? url('storage/uploads/individual_clients/' . $individualClient->document) : null,
+                ],
+            ], 200);
+        } elseif ($clientType === 'CORPORATE') {
+            // Fetch uploads for corporate clients
+            $corporateClient = Corporate_clients::where('client_id', $id)->first();
+
+            if (!$corporateClient) {
+                return response()->json(['message' => 'Corporate client details not found'], 404);
+            }
+
+            return response()->json([
+                'message' => 'Corporate client uploads retrieved successfully',
+                'uploads' => [
+                    'certificate_of_incorporation' => $corporateClient->certificate_of_incorporation ? url('storage/uploads/corporate_clients/' . $corporateClient->certificate_of_incorporation) : null,
+                    'company_registration' => $corporateClient->company_registration ? url('storage/uploads/corporate_clients/' . $corporateClient->company_registration) : null,
+                ],
+            ], 200);
+        } else {
+            return response()->json(['message' => 'Invalid client type'], 400);
+        }
+    }
+
+    public function deleteClientUpload(Request $request, $id)
+    {
+        // Authenticate user
+        $user = Auth::user();
+
+        if (!$user) {
+            return response(['message' => 'Unauthorized'], 403);
+        }
+
+        // Validate the request
+        $request->validate([
+            'upload_type' => 'required|string|in:document,certificate_of_incorporation,company_registration',
+        ]);
+
+        // Find the client
+        $client = Client::find($id);
+
+        if (!$client) {
+            return response()->json(['message' => 'Client not found'], 404);
+        }
+
+        // Determine client type
+        $clientType = strtoupper($client->client_type);
+        $uploadType = $request->upload_type;
+
+        if ($clientType === 'INDIVIDUAL') {
+            // Fetch individual client details
+            $individualClient = Individual_clients::where('client_id', $id)->first();
+
+            if (!$individualClient) {
+                return response()->json(['message' => 'Individual client details not found'], 404);
+            }
+
+            if ($uploadType === 'document') {
+                if ($individualClient->document) {
+                    // Delete the file from storage
+                    Storage::disk('public')->delete('uploads/individual_clients/' . $individualClient->document);
+
+                    // Update the database
+                    $individualClient->update(['document' => null]);
+
+                    return response()->json(['message' => 'Document deleted successfully'], 200);
+                } else {
+                    return response()->json(['message' => 'No document found to delete'], 404);
+                }
+            }
+        } elseif ($clientType === 'CORPORATE') {
+            // Fetch corporate client details
+            $corporateClient = Corporate_clients::where('client_id', $id)->first();
+
+            if (!$corporateClient) {
+                return response()->json(['message' => 'Corporate client details not found'], 404);
+            }
+
+            if ($uploadType === 'certificate_of_incorporation') {
+                if ($corporateClient->certificate_of_incorporation) {
+                    // Delete the file from storage
+                    Storage::disk('public')->delete('uploads/corporate_clients/' . $corporateClient->certificate_of_incorporation);
+
+                    // Update the database
+                    $corporateClient->update(['certificate_of_incorporation' => null]);
+
+                    return response()->json(['message' => 'Certificate of incorporation deleted successfully'], 200);
+                } else {
+                    return response()->json(['message' => 'No certificate of incorporation found to delete'], 404);
+                }
+            } elseif ($uploadType === 'company_registration') {
+                if ($corporateClient->company_registration) {
+                    // Delete the file from storage
+                    Storage::disk('public')->delete('uploads/corporate_clients/' . $corporateClient->company_registration);
+
+                    // Update the database
+                    $corporateClient->update(['company_registration' => null]);
+
+                    return response()->json(['message' => 'Company registration deleted successfully'], 200);
+                } else {
+                    return response()->json(['message' => 'No company registration found to delete'], 404);
+                }
+            }
+        } else {
+            return response()->json(['message' => 'Invalid client type'], 400);
+        }
+    }
 }

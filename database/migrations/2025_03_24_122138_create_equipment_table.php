@@ -15,7 +15,7 @@ return new class extends Migration
     {
         Schema::create('equipment', function (Blueprint $table) {
             $table->id();
-            $table->uuid('serial_number')->unique();
+            $table->string('serial_number')->unique();
             $table->string('name');
             $table->text('description');
             $table->unsignedBigInteger('service_provider_id')->nullable();

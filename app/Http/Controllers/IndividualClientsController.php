@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Aws\S3\Exception\S3Exception;
 use Aws\Sns\SnsClient;
@@ -46,69 +47,96 @@ class IndividualClientsController extends Controller
         return response()->json($corporateClient);
     }
 
+    public function generateOTP()
+    {
+        do {
+            $otp = random_int(100000, 999999);
+        } while (Client::where("otp", "=", $otp)->first());
+
+        return $otp;
+    }
+
     //Store individual client details
     public function store(Request $request)
     {
-        $client_id = $request->client_id;
+        $user = Auth::user();
 
-        // Check if the client exists
-        $check_individual_client = Individual_clients::where('id', $client_id)->first();
-
-        if ($check_individual_client) {
-            return response()->json(['message' => 'Individual Client already exist'], 404);
+        if (!$user) {
+            return response(['message' => 'Unauthorized'], 403);
         }
 
+        // Validate client and individual client details
         $request->validate([
+            'email' => 'required|email|unique:clients,email',
+            'phone' => 'required|string|max:15|unique:clients,phone',
+            'client_type' => 'required|string|exists:customer_types,name',
             'first_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name' => 'required|string|max:255',
             'address' => 'required|string|max:255',
             'gps_address' => 'nullable|string|max:255',
-            'document_type' => 'required|string|max:255',
-            'document' => 'nullable|string|max:255',
-            'client_id' => 'required|integer|unique:individual_clients,client_id',
+            'document_type' => 'required|string|in:PASSPORT,NATIONAL_ID',
+            'document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
         ]);
 
-        // Store individual client details
-        DB::table('individual_clients')->insert([
-            'first_name' => $request->first_name,
-            'middle_name' => $request->middle_name,
-            'last_name' => $request->last_name,
-            'address' => $request->address,
-            'gps_address' => $request->gps_address,
-            'document_type' => $request->document_type,
-            'document' => $request->document ?? 'No upload',
-            'client_id' => $client_id,
-            'created_at' => Carbon::now(),
-            'updated_at' => Carbon::now()
-        ]);
+        try {
+            \DB::beginTransaction();
 
-        // Check if document type is passport
-        if ($request->hasFile('file') && strtoupper($request->document_type) == 'PASSPORT') {
-            $file = $request->file('file');
-            $filePath = $client_id . '/' . 'passport_upload_' . Carbon::now()->toDateTimeString() . '_' . $file->getClientOriginalName();
-            Storage::disk('s3')->put($filePath, file_get_contents($file));
+            $otp = $this->generateOTP();
+            $email_verification = Str::uuid()->toString();
 
-            DB::table('individual_clients')
-                ->where('client_id', $client_id)
-                ->update([
-                    'document' => $filePath
-                ]);
+            // Create the client
+            $client = Client::create([
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'password' => Hash::make(Str::random(8)), // Generate a random password
+                'client_type' => $request->client_type,
+                'OTP' => $otp,
+                'email_token' => $email_verification,
+                'created_by' => $user->id,
+                'created_by_type' => get_class($user), // Store the type of user who created the client
+            ]);
+
+              // check if client_type is individual
+              if ($request->client_type !== 'INDIVIDUAL') {
+                \DB::rollBack();
+                return response()->json(['message' => 'Client type must be INDIVIDUAL'], 422);
+            }
+
+            // Log the creation of the client
+            Log::info('Client details stored', ['client_id' => $client->id]);
+
+            // Handle file uploads for document
+            $documentFileName = null;
+
+            if ($request->hasFile('document')) {
+                $file = $request->file('document');
+                $documentFileName = strtolower($request->document_type) . '_upload_' . $client->id . '_' . Str::slug($request->first_name . ' ' . $request->last_name) . '_' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
+                $file->storeAs('uploads/individual_clients', $documentFileName, 'public');
+            }
+
+            // Store individual client details
+            Individual_clients::create([
+                'first_name' => $request->first_name,
+                'middle_name' => $request->middle_name,
+                'last_name' => $request->last_name,
+                'address' => $request->address,
+                'gps_address' => $request->gps_address,
+                'document_type' => $request->document_type,
+                'document' => $documentFileName ?? 'No upload',
+                'client_id' => $client->id,
+            ]);
+
+            Log::info('Individual client details stored', ['client_id' => $client->id]);
+
+            \DB::commit();
+
+            return response()->json(['message' => 'Individual client created successfully'], 201);
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            Log::error('Failed to create individual client', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to create individual client'], 500);
         }
-
-        // Check if document type is national id
-        if ($request->hasFile('file') && strtoupper($request->document_type) == 'NATIONAL_ID') {
-            $file = $request->file('file');
-            $filePath = $client_id . '/' . 'national_id_upload_' . Carbon::now()->toDateTimeString() . '_' . $file->getClientOriginalName();
-            Storage::disk('s3')->put($filePath, file_get_contents($file));
-
-            DB::table('individual_clients')
-                ->where('client_id', $client_id)
-                ->update([
-                    'document' => $filePath
-                ]);
-        }
-
     }
 
   
