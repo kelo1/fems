@@ -5,16 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Billing extends Model
+class ServiceProviderVAT extends Model
 {
     use HasFactory;
 
-    protected $table = 'billings';
+    protected $table = 'service_provider_vats';
 
     protected $fillable = [
-        'DESCRIPTION',
-        'VAT_APPLICABLE',
-        'isACTIVE',
+        'service_provider_id',
         'VAT_RATE',
         'created_by',
         'created_by_type',

@@ -36,4 +36,15 @@ class ServiceProvider extends Authenticatable
     {
         return $this->belongsTo(LicenseType::class, 'license_id');
     }
+
+    public function equipmentServiceProviders()
+    {
+        return $this->hasMany(EquipmentServiceProvider::class);
+    }
+
+    // Invoice relationship
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class, 'service_provider_id');
+    }
 }

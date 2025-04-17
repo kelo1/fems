@@ -55,5 +55,15 @@ class Client extends Model
         return $this->hasMany(Equipment::class);
     }
 
+    public function equipmentClients()
+    {
+        return $this->hasMany(EquipmentClient::class);
+    }
+
+    // Relationship with Invoicing
+    public function invoicings()
+    {
+        return $this->hasMany(Invoicing::class, 'client_id');
+    }
     
 }

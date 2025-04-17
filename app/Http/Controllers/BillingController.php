@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
+use App\Models\ServiceProvider;
+use App\Models\ServiceProviderVAT;
 
 class BillingController extends Controller
 {
@@ -45,15 +48,12 @@ class BillingController extends Controller
         if (!$user) {
             return response(['message' => 'Unauthorized'], 403);
         }
-        
 
         $request->validate([
             'DESCRIPTION' => 'nullable|string|max:255',
             'VAT_APPLICABLE' => 'nullable|boolean',
             'isACTIVE' => 'nullable|boolean',
         ]);
-
-
 
         $billing = Billing::create([
             'DESCRIPTION' => $request->DESCRIPTION,
@@ -62,9 +62,29 @@ class BillingController extends Controller
             'created_by' => $user->id,
             'created_by_type' => get_class($user),
         ]);
+
         // Log the creation of the billing
         \Log::info('Billing created', ['billing' => $billing]);
-        // Return a success response
+
+        // Check if VAT is applicable
+        if ($request->has('VAT_APPLICABLE') && ($request->VAT_APPLICABLE === true || $request->VAT_APPLICABLE === 1)) {
+            $request->validate([
+                'VAT_RATE' => 'required|numeric|min:0|max:100',
+            ]);
+
+            // Check if a VAT record already exists for this service provider
+            $existingVAT = ServiceProviderVAT::where('service_provider_id', $user->id)->first();
+
+            if (!$existingVAT) {
+                // Create a new VAT record
+                ServiceProviderVAT::create([
+                    'service_provider_id' => $user->id,
+                    'VAT_RATE' => $request->VAT_RATE,
+                    'created_by' => $user->id,
+                    'created_by_type' => get_class($user),
+                ]);
+            }
+        }
 
         return response()->json(['message' => 'Billing created successfully', 'data' => $billing], 201);
     }
@@ -130,6 +150,13 @@ class BillingController extends Controller
      */
     public function update(Request $request, $id)
     {
+         // Check if the user is authenticated
+         $user = Auth::user();
+
+         if (!$user) {
+             return response(['message' => 'Unauthorized'], 403);
+         }
+
         $request->validate([
             'DESCRIPTION' => 'sometimes|string|max:255',
             'VAT_APPLICABLE' => 'sometimes|boolean',
@@ -142,11 +169,74 @@ class BillingController extends Controller
             return response()->json(['message' => 'Billing not found'], 404);
         }
 
-       $billing->update($request->all());
+        $billing->update($request->all());
+
+        // Check if VAT is applicable
+        if ($request->has('VAT_APPLICABLE') && ($request->VAT_APPLICABLE === true || $request->VAT_APPLICABLE === 1)) {
+            $request->validate([
+                'VAT_RATE' => 'required|numeric|min:0|max:100',
+            ]);
+
+            // Check if a VAT record already exists for this service provider
+            $existingVAT = ServiceProviderVAT::where('service_provider_id', $billing->created_by)->first();
+
+            if (!$existingVAT) {
+                // Create a new VAT record
+                ServiceProviderVAT::create([
+                    'service_provider_id' => $billing->created_by,
+                    'VAT_RATE' => $request->VAT_RATE,
+                    'created_by' => $billing->created_by,
+                    'created_by_type' => get_class(Auth::user()),
+                ]);
+            }
+        }
+
         // Log the update of the billing
         \Log::info('Billing updated', ['billing' => $billing]);
-        // Return a success response
+
         return response()->json(['message' => 'Billing updated successfully', 'data' => $billing], 200);
+    }
+
+    /**
+     * Update the VAT rate for a specific service provider.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $serviceProviderId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateVATRate(Request $request, $serviceProviderId)
+    {   
+         // Check if the user is authenticated
+         $user = Auth::user();
+
+         if (!$user) {
+             return response(['message' => 'Unauthorized'], 403);
+         }
+
+        $request->validate([
+            'VAT_RATE' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $existingVAT = ServiceProviderVAT::where('service_provider_id', $serviceProviderId)->first();
+
+        if ($existingVAT) {
+            // Update the existing VAT record
+            $existingVAT->update([
+                'VAT_RATE' => $request->VAT_RATE,
+                'created_by' => $user->id,
+                'created_by_type' => get_class($user),
+            ]);
+        } else {
+            // Create a new VAT record
+            $existingVAT = ServiceProviderVAT::create([
+                'service_provider_id' => $user->id,
+                'VAT_RATE' => $request->VAT_RATE,
+                'created_by' => $user->id,
+                'created_by_type' => get_class($user),
+            ]);
+        }
+
+        return response()->json(['message' => 'VAT rate updated successfully', 'data' => $existingVAT], 200);
     }
 
     /**
@@ -164,6 +254,8 @@ class BillingController extends Controller
         }
 
         $billing->delete();
+        //also delete the associated VAT record
+        
 
         return response()->json(['message' => 'Billing deleted successfully'], 200);
     }

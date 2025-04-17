@@ -60,7 +60,7 @@ class EquipmentController extends Controller
 
             // Create the equipment
             $equipment = Equipment::create(array_merge($request->all(), [
-                'serial_number' => $serial_number,
+                'serial_number' => $serial_number, // Use the same serial_number
                 'created_by' => $user->id,
                 'created_by_type' => get_class($user),
             ]));
@@ -69,7 +69,7 @@ class EquipmentController extends Controller
             if ($request->client_id) {
                 EquipmentClient::create([
                     'equipment_id' => $equipment->id,
-                    'serial_number' => $serial_number,
+                    'serial_number' => $equipment->serial_number, // Use the same serial_number from Equipment
                     'client_id' => $request->client_id,
                     'status_client' => 1,
                 ]);
@@ -79,7 +79,7 @@ class EquipmentController extends Controller
             if ($request->service_provider_id) {
                 EquipmentServiceProvider::create([
                     'equipment_id' => $equipment->id,
-                    'serial_number' => $serial_number,
+                    'serial_number' => $equipment->serial_number, // Use the same serial_number from Equipment
                     'service_provider_id' => $request->service_provider_id,
                     'status_service_provider' => 1,
                 ]);
