@@ -100,7 +100,7 @@ class CorporateClientsController extends Controller
             // Log the creation of the client
             Log::info('Client details stored', ['client_id' => $client->id]);
 
-            // check if client_type is corporate
+            // Check if client_type is corporate
             if ($request->client_type !== 'CORPORATE') {
                 \DB::rollBack();
                 return response()->json(['message' => 'Client type must be corporate'], 422);
@@ -109,17 +109,21 @@ class CorporateClientsController extends Controller
             // Handle file uploads
             $certificateFileName = null;
             $registrationFileName = null;
+            $certificateUrl = null;
+            $registrationUrl = null;
 
             if ($request->hasFile('certificate_of_incorporation')) {
                 $certificateFile = $request->file('certificate_of_incorporation');
                 $certificateFileName = 'certificate_' . $client->id . '_' . Str::slug($request->company_name) . '_' . now()->format('YmdHis') . '.' . $certificateFile->getClientOriginalExtension();
                 $certificateFile->storeAs('uploads/corporate_clients', $certificateFileName, 'public');
+                $certificateUrl = Storage::url('uploads/corporate_clients/' . $certificateFileName);
             }
 
             if ($request->hasFile('company_registration')) {
                 $registrationFile = $request->file('company_registration');
                 $registrationFileName = 'registration_' . $client->id . '_' . Str::slug($request->company_name) . '_' . now()->format('YmdHis') . '.' . $registrationFile->getClientOriginalExtension();
                 $registrationFile->storeAs('uploads/corporate_clients', $registrationFileName, 'public');
+                $registrationUrl = Storage::url('uploads/corporate_clients/' . $registrationFileName);
             }
 
             // Store corporate client details
@@ -140,7 +144,12 @@ class CorporateClientsController extends Controller
 
             \DB::commit();
 
-            return response()->json(['message' => 'Corporate client created successfully'], 201);
+            return response()->json([
+                'message' => 'Corporate client created successfully',
+                'client' => $client,
+                'certificate_url' => $certificateUrl,
+                'registration_url' => $registrationUrl,
+            ], 201);
         } catch (\Exception $e) {
             \DB::rollBack();
             Log::error('Failed to create corporate client', ['error' => $e->getMessage()]);

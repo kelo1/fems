@@ -97,8 +97,8 @@ class IndividualClientsController extends Controller
                 'created_by_type' => get_class($user), // Store the type of user who created the client
             ]);
 
-              // check if client_type is individual
-              if ($request->client_type !== 'INDIVIDUAL') {
+            // Check if client_type is individual
+            if ($request->client_type !== 'INDIVIDUAL') {
                 \DB::rollBack();
                 return response()->json(['message' => 'Client type must be INDIVIDUAL'], 422);
             }
@@ -108,11 +108,13 @@ class IndividualClientsController extends Controller
 
             // Handle file uploads for document
             $documentFileName = null;
+            $documentUrl = null;
 
             if ($request->hasFile('document')) {
                 $file = $request->file('document');
                 $documentFileName = strtolower($request->document_type) . '_upload_' . $client->id . '_' . Str::slug($request->first_name . ' ' . $request->last_name) . '_' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
                 $file->storeAs('uploads/individual_clients', $documentFileName, 'public');
+                $documentUrl = Storage::url('uploads/individual_clients/' . $documentFileName);
             }
 
             // Store individual client details
@@ -131,7 +133,11 @@ class IndividualClientsController extends Controller
 
             \DB::commit();
 
-            return response()->json(['message' => 'Individual client created successfully'], 201);
+            return response()->json([
+                'message' => 'Individual client created successfully',
+                'client' => $client,
+                'document_url' => $documentUrl,
+            ], 201);
         } catch (\Exception $e) {
             \DB::rollBack();
             Log::error('Failed to create individual client', ['error' => $e->getMessage()]);
