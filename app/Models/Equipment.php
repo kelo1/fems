@@ -59,4 +59,10 @@ class Equipment extends Model
     {
         return $this->hasMany(EquipmentServiceProvider::class);
     }
+
+    // Relationship with EquipmentActivity
+    public function equipmentActivities()
+    {
+        return $this->hasMany(EquipmentActivity::class);
+    }
 }

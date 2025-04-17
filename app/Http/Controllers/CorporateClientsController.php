@@ -37,14 +37,60 @@ class CorporateClientsController extends Controller
       // Get all corporate clients
     public function getCorporateClients()
     {
-        $corporateClients = Corporate_clients::with('client', 'corporateType')->get();
-        return response()->json($corporateClients);
+        try {
+            // Retrieve all corporate clients with their associated client and corporate type details
+            $corporateClients = Corporate_clients::with('client', 'corporateType')->get();
+
+            // Add certificate and registration URLs to each corporate client
+            $corporateClientsWithUrls = $corporateClients->map(function ($corporateClient) {
+                $corporateClient->certificate_url = $corporateClient->certificate_of_incorporation
+                    ? Storage::url('uploads/corporate_clients/' . $corporateClient->certificate_of_incorporation)
+                    : null;
+
+                $corporateClient->registration_url = $corporateClient->company_registration
+                    ? Storage::url('uploads/corporate_clients/' . $corporateClient->company_registration)
+                    : null;
+
+                return $corporateClient;
+            });
+
+            return response()->json([
+                'message' => 'Corporate clients retrieved successfully',
+                'data' => $corporateClientsWithUrls,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve corporate clients', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to retrieve corporate clients'], 500);
+        }
     }
 
     public function getCorporateClientByID($id)
     {
-        $corporateClient = Corporate_clients::with('client', 'corporateType')->where('client_id', $id)->first();
-        return response()->json($corporateClient);
+        try {
+            // Retrieve the corporate client by ID with associated client and corporate type details
+            $corporateClient = Corporate_clients::with('client', 'corporateType')->where('client_id', $id)->first();
+
+            if (!$corporateClient) {
+                return response()->json(['message' => 'Corporate client not found'], 404);
+            }
+
+            // Add certificate and registration URLs to the corporate client
+            $corporateClient->certificate_url = $corporateClient->certificate_of_incorporation
+                ? Storage::url('uploads/corporate_clients/' . $corporateClient->certificate_of_incorporation)
+                : null;
+
+            $corporateClient->registration_url = $corporateClient->company_registration
+                ? Storage::url('uploads/corporate_clients/' . $corporateClient->company_registration)
+                : null;
+
+            return response()->json([
+                'message' => 'Corporate client retrieved successfully',
+                'data' => $corporateClient,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve corporate client by ID', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to retrieve corporate client'], 500);
+        }
     }
     
     public function generateOTP()

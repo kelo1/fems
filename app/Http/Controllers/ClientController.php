@@ -692,9 +692,17 @@ class ClientController extends Controller
                 'individual_clients.document'
             )->get();
 
+            // Add document URL to each individual client
+            $clientsWithDocumentUrl = $clients->map(function ($client) {
+                $client->document_url = $client->document
+                    ? Storage::url('uploads/individual_clients/' . $client->document)
+                    : null;
+                return $client;
+            });
+
             return response()->json([
                 'message' => 'Individual clients retrieved successfully',
-                'clients' => $clients,
+                'clients' => $clientsWithDocumentUrl,
             ], 200);
         } catch (\Exception $e) {
             \Log::error('Error in getClientByIndividual method', ['error' => $e->getMessage()]);

@@ -20,12 +20,35 @@ use Illuminate\Support\Facades\Auth;
 class EquipmentController extends Controller
 {
     public function index()
-    {   // Authenticate the user = FEMSAdmin
-        $user = Auth::user();
-        if (!($user instanceof \App\Models\FEMSAdmin)) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+    {
+        try {
+            // Authenticate the user as FEMSAdmin
+            $user = Auth::user();
+            if (!($user instanceof \App\Models\FEMSAdmin)) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            // Retrieve all equipment with associated records
+            $equipment = Equipment::with([
+                'equipmentClients' => function ($query) {
+                    $query->where('status_client', 1); // Only active clients
+                },
+                'equipmentServiceProviders' => function ($query) {
+                    $query->where('status_service_provider', 1); // Only active service providers
+                },
+                'equipmentActivities' // Include all activities
+            ])->get();
+
+            return response()->json(['message' => 'Equipment retrieved successfully', 'data' => $equipment], 200);
+        } catch (\Exception $e) {
+            // Log the error
+            \Log::error('Error in index method', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json(['message' => 'An error occurred while retrieving equipment'], 500);
         }
-        return Equipment::all();
     }
 
     public function store(Request $request)
@@ -217,14 +240,86 @@ class EquipmentController extends Controller
 
     public function getEquipmentByServiceProvider($service_provider_id)
     {
-        $equipment = Equipment::where('service_provider_id', $service_provider_id)->with('serviceProvider', 'client', 'serial_number')->get();
-        return response()->json($equipment);
+        try {
+            // Retrieve equipment for the given service provider with associated records
+            $equipment = Equipment::with([
+                'equipmentClients' => function ($query) {
+                    $query->where('status_client', 1); // Only active clients
+                },
+                'equipmentServiceProviders' => function ($query) {
+                    $query->where('status_service_provider', 1); // Only active service providers
+                },
+                'equipmentActivities' // Include all activities
+            ])->whereHas('equipmentServiceProviders', function ($query) use ($service_provider_id) {
+                $query->where('service_provider_id', $service_provider_id);
+            })->get();
+
+            if ($equipment->isEmpty()) {
+                return response()->json(['message' => 'No equipment found for the specified service provider'], 404);
+            }
+
+            // Add equipmentStatus to each equipment record
+            $equipmentWithStatus = $equipment->map(function ($item) {
+                $item->equipment_status = $this->determineEquipmentStatus($item->id);
+                return $item;
+            });
+
+            return response()->json([
+                'message' => 'Equipment retrieved successfully',
+                'data' => $equipmentWithStatus,
+            ], 200);
+        } catch (\Exception $e) {
+            // Log the error
+            \Log::error('Error in getEquipmentByServiceProvider method', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json(['message' => 'An error occurred while retrieving equipment'], 500);
+        }
     }
 
     public function getEquipmentByClient($client_id)
     {
-        $equipment = Equipment::where('client_id', $client_id)->with('serviceProvider', 'client', 'serial_number')->get();
-        return response()->json($equipment);
+        try {
+            // Retrieve equipment for the given client with associated records
+            $equipment = Equipment::with([
+                'equipmentClients' => function ($query) {
+                    $query->where('status_client', 1); // Only active clients
+                },
+                'equipmentServiceProviders' => function ($query) {
+                    $query->where('status_service_provider', 1); // Only active service providers
+                },
+                'equipmentActivities' => function ($query) use ($client_id) {
+                    $query->where('client_id', $client_id); // Filter activities by client_id
+                }
+            ])->whereHas('equipmentClients', function ($query) use ($client_id) {
+                $query->where('client_id', $client_id);
+            })->get();
+
+            if ($equipment->isEmpty()) {
+                return response()->json(['message' => 'No equipment found for the specified client'], 404);
+            }
+
+            // Add equipmentStatus to each equipment record
+            $equipmentWithStatus = $equipment->map(function ($item) {
+                $item->equipment_status = $this->determineEquipmentStatus($item->id);
+                return $item;
+            });
+
+            return response()->json([
+                'message' => 'Equipment retrieved successfully',
+                'data' => $equipmentWithStatus,
+            ], 200);
+        } catch (\Exception $e) {
+            // Log the error
+            \Log::error('Error in getEquipmentByClient method', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json(['message' => 'An error occurred while retrieving equipment'], 500);
+        }
     }
 
     public function destroy($id)
@@ -375,25 +470,32 @@ class EquipmentController extends Controller
     {     
 
         try {
-            // Retrieve the equipment record with its associated client and service provider data
+            // Retrieve the equipment record with its associated client, service provider, and filtered activities
             $equipment = Equipment::with([
                 'equipmentClients' => function ($query) {
-                    $query->where('status_client', 1);
+                    $query->where('status_client', 1); // Only active clients
                 },
                 'equipmentServiceProviders' => function ($query) {
-                    $query->where('status_service_provider', 1);
+                    $query->where('status_service_provider', 1); // Only active service providers
+                },
+                'equipmentActivities' => function ($query) use ($id) {
+                    $query->where('equipment_id', $id); // Filter activities by equipment_id
                 }
             ])->findOrFail($id);
 
             // Hide the equipment_clients and equipment_service_providers relationships in the equipment object
             $equipment->makeHidden(['equipmentClients', 'equipmentServiceProviders']);
-
+            
+            // Determine the equipment status
+            $equipmentStatus = $this->determineEquipmentStatus($id);
 
             // Format the response as an associative array
             $response = [
                 'equipment' => $equipment,
                 'clients' => $equipment->equipmentClients,
                 'service_providers' => $equipment->equipmentServiceProviders,
+                'activities' => $equipment->equipmentActivities,
+                'equipment_status' => $equipmentStatus,
             ];
 
             return response()->json(['message' => 'Equipment retrieved successfully', 'data' => $response], 200);
@@ -426,6 +528,11 @@ class EquipmentController extends Controller
                 return response()->json(['message' => 'Equipment not found'], 404);
             }
 
+            $id = Equipment::where('serial_number', $serial_number)->value('id');
+
+              // Determine the equipment status
+              $equipmentStatus = $this->determineEquipmentStatus($id);
+
             // Hide the equipment_clients and equipment_service_providers relationships in the equipment object
             $equipment->makeHidden(['equipmentClients', 'equipmentServiceProviders']);
 
@@ -434,6 +541,7 @@ class EquipmentController extends Controller
                 'equipment' => $equipment,
                 'clients' => $equipment->equipmentClients,
                 'service_providers' => $equipment->equipmentServiceProviders,
+                'equipment_status' => $equipmentStatus,
             ];
 
             return response()->json(['message' => 'Equipment retrieved successfully', 'data' => $response], 200);
@@ -492,6 +600,30 @@ class EquipmentController extends Controller
 
             return response()->json(['message' => 'An error occurred while checking equipment status'], 500);
         }
+    }
+
+    private function determineEquipmentStatus($id)
+    {
+        // Check if the equipment is expired
+        $expiredEquipment = Equipment::where('id', $id)
+            ->where('expiry_date', '<', Carbon::now())
+            ->exists();
+
+        if ($expiredEquipment) {
+            return 'Expired';
+        }
+
+        // Check if the equipment is expiring soon
+        $expiringSoonEquipment = Equipment::where('id', $id)
+            ->whereBetween('expiry_date', [Carbon::now(), Carbon::now()->addWeek()])
+            ->exists();
+
+        if ($expiringSoonEquipment) {
+            return 'Renewal Due Soon';
+        }
+
+        // If neither expired nor expiring soon, return Active
+        return 'Active';
     }
 
 }

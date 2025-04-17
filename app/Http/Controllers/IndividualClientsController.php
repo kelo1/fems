@@ -37,14 +37,51 @@ class IndividualClientsController extends Controller
 
     public function getIndividualClients()
     {
-        $individualClients = Individual_clients::with('client')->get();
-        return response()->json($individualClients);
+        try {
+            // Retrieve all individual clients with their associated client details
+            $individualClients = Individual_clients::with('client')->get();
+
+            // Add document URL to each individual client
+            $individualClientsWithDocumentUrl = $individualClients->map(function ($individualClient) {
+                $individualClient->document_url = $individualClient->document
+                    ? Storage::url('uploads/individual_clients/' . $individualClient->document)
+                    : null;
+                return $individualClient;
+            });
+
+            return response()->json([
+                'message' => 'Individual clients retrieved successfully',
+                'data' => $individualClientsWithDocumentUrl,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve individual clients', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to retrieve individual clients'], 500);
+        }
     }
 
     public function getIndividualClientsByID($id)
-    { 
-        $corporateClient = Individual_clients::with('client')->where('client_id', $id)->first();
-        return response()->json($corporateClient);
+    {
+        try {
+            // Retrieve the individual client by ID with associated client details
+            $individualClient = Individual_clients::with('client')->where('client_id', $id)->first();
+
+            if (!$individualClient) {
+                return response()->json(['message' => 'Individual client not found'], 404);
+            }
+
+            // Add document URL to the individual client
+            $individualClient->document_url = $individualClient->document
+                ? Storage::url('uploads/individual_clients/' . $individualClient->document)
+                : null;
+
+            return response()->json([
+                'message' => 'Individual client retrieved successfully',
+                'data' => $individualClient,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve individual client by ID', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to retrieve individual client'], 500);
+        }
     }
 
     public function generateOTP()

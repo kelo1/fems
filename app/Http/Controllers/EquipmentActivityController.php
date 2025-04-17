@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\EquipmentActivity;
+use App\Models\Equipment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -28,18 +29,43 @@ class EquipmentActivityController extends Controller
             'next_maintenance_date' => 'nullable|date',
             'service_provider_id' => 'nullable|integer|exists:service_providers,id',
             'client_id' => 'nullable|integer|exists:clients,id',
+            'equipment_id' => 'required|integer|exists:equipment,id',
         ]);
 
-        $activity = EquipmentActivity::create([
-            'activity' => $request->activity,
-            'next_maintenance_date' => $request->next_maintenance_date,
-            'service_provider_id' => $request->service_provider_id,
-            'client_id' => $request->client_id,
-            'created_by' => $user->id,
-            'created_by_type' => get_class($user),
-        ]);
+        try {
+            \DB::beginTransaction();
 
-        return response()->json(['message' => 'Equipment activity created successfully', 'activity' => $activity], 201);
+            // Create the equipment activity
+            $activity = EquipmentActivity::create([
+                'activity' => $request->activity,
+                'next_maintenance_date' => $request->next_maintenance_date,
+                'service_provider_id' => $request->service_provider_id,
+                'device_serial_number' => $request->device_serial_number,
+                'client_id' => $request->client_id,
+                'equipment_id' => $request->equipment_id,
+                'created_by' => $user->id,
+                'created_by_type' => get_class($user),
+            ]);
+
+            // Update the parent Equipment table if next_maintenance_date is provided
+            if ($request->next_maintenance_date) {
+                $equipment = Equipment::findOrFail($request->equipment_id);
+                $equipment->update([
+                    'expiry_date' => $request->next_maintenance_date,
+                ]);
+            }
+
+            \DB::commit();
+
+            return response()->json(['message' => 'Equipment activity created successfully', 'activity' => $activity], 201);
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            \Log::error('Error creating equipment activity', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['message' => 'Failed to create equipment activity'], 500);
+        }
     }
 
     public function show($id)

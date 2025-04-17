@@ -21,6 +21,7 @@ use App\Http\Controllers\CorporateTypeController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CustomerTypeController;
 use App\Http\Controllers\InvoicingController;
+use App\Http\Controllers\EquipmentActivityController;
 
 
 /*
@@ -180,7 +181,12 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::delete('/invoicing/delete/{id}', [InvoicingController::class, 'destroy'])->name('delete_invoicing');
   Route::get('/invoices/edit/{id}', [InvoicingController::class, 'edit'])->name('edit_invoicing');
 
-
+  //Protected Equipment Activity Routes
+  Route::get('/equipment_activity/all', [EquipmentActivityController::class, 'index'])->name('all_equipment_activities');
+  Route::post('/equipment_activity/create', [EquipmentActivityController::class, 'store'])->name('create_equipment_activity');
+  Route::get('/equipment_activity/{id}', [EquipmentActivityController::class, 'show'])->name('equipment_activity_show');
+  Route::put('/equipment_activity/update/{id}', [EquipmentActivityController::class, 'update'])->name('update_equipment_activity');
+  Route::delete('/equipment_activity/delete/{id}', [EquipmentActivityController::class, 'destroy'])->name('delete_equipment_activity');
 });
 
 // Route::middleware('auth:sanctum')->get('/user', function (Request $request) {

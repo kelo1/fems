@@ -16,6 +16,9 @@ class EquipmentActivity extends Model
         'service_provider_id',
         'client_id',
         'created_by',
+        'device_serial_number',
+        'equipment_id',
+        'created_by',
         'created_by_type',
     ];
 

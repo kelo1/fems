@@ -21,7 +21,7 @@ return new class extends Migration
             $table->unsignedBigInteger('client_id')->nullable(); // Client ID
             $table->unsignedBigInteger('created_by'); // Created by user ID
             $table->unsignedBigInteger('equipment_id')->nullable(); // Equipment ID
-            $table->string('equipment_serial_number')->nullable(); // Equipment serial number
+            $table->string('device_serial_number')->nullable(); // Equipment serial number
             $table->string('created_by_type'); // Created by user type
             $table->timestamps();
 
