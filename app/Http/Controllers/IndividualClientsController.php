@@ -41,10 +41,13 @@ class IndividualClientsController extends Controller
             // Retrieve all individual clients with their associated client details
             $individualClients = Individual_clients::with('client')->get();
 
+            // Get the base URL from the environment variable
+            $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
+
             // Add document URL to each individual client
-            $individualClientsWithDocumentUrl = $individualClients->map(function ($individualClient) {
+            $individualClientsWithDocumentUrl = $individualClients->map(function ($individualClient) use ($baseURL) {
                 $individualClient->document_url = $individualClient->document
-                    ? Storage::url('uploads/individual_clients/' . $individualClient->document)
+                    ? $baseURL . Storage::url('uploads/individual_clients/' . $individualClient->document)
                     : null;
                 return $individualClient;
             });
@@ -69,9 +72,12 @@ class IndividualClientsController extends Controller
                 return response()->json(['message' => 'Individual client not found'], 404);
             }
 
+            // Get the base URL from the environment variable
+            $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
+
             // Add document URL to the individual client
             $individualClient->document_url = $individualClient->document
-                ? Storage::url('uploads/individual_clients/' . $individualClient->document)
+                ? $baseURL . Storage::url('uploads/individual_clients/' . $individualClient->document)
                 : null;
 
             return response()->json([

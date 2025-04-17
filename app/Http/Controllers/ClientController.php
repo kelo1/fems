@@ -512,7 +512,7 @@ class ClientController extends Controller
                 return response(['message' => 'Unauthorized'], 403);
             }
 
-            if(!$request->has('corporate_type_id')) {
+            if (!$request->has('corporate_type_id')) {
                 return response()->json(['message' => 'Corporate type ID is required'], 400);
             }
 
@@ -524,7 +524,6 @@ class ClientController extends Controller
             ]);
 
             // Extract parameters from the request
-    
             $corporate_type_id = $request->corporate_type_id;
             $rawUserType = $request->user_type ?? null;
             $userId = $request->user_id ?? null;
@@ -562,7 +561,7 @@ class ClientController extends Controller
             } else {
                 // Other users only see their own clients
                 $query->where('clients.created_by', $user->id)
-                      ->where('clients.created_by_type', $authenticatedUserType);
+                    ->where('clients.created_by_type', $authenticatedUserType);
     
                 // Apply user_type and user_id filters only if they match the current user
                 if ($mappedUserType && $authenticatedUserType === 'App\Models\\' . $mappedUserType) {
@@ -586,14 +585,31 @@ class ClientController extends Controller
                 'corporate_clients.company_email',
                 'corporate_clients.company_phone',
                 'corporate_clients.certificate_of_incorporation',
+                'corporate_clients.company_registration',
                 'corporate_clients.gps_address',
                 'corporate_clients.corporate_type_id'
             )->get();
     
+            // Get the base URL from the environment variable
+            $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
+    
+            // Add certificate and registration URLs to each corporate client
+            $clientsWithUrls = $clients->map(function ($client) use ($baseURL) {
+                $client->certificate_url = $client->certificate_of_incorporation
+                    ? $baseURL . Storage::url('uploads/corporate_clients/' . $client->certificate_of_incorporation)
+                    : null;
+    
+                $client->registration_url = $client->company_registration
+                    ? $baseURL . Storage::url('uploads/corporate_clients/' . $client->company_registration)
+                    : null;
+    
+                return $client;
+            });
+    
             return response()->json([
                 'message' => 'Clients retrieved successfully',
                 'corporate_type' => $corporateType->name,
-                'clients' => $clients,
+                'clients' => $clientsWithUrls,
             ], 200);
     
         } catch (\Exception $e) {
@@ -692,10 +708,13 @@ class ClientController extends Controller
                 'individual_clients.document'
             )->get();
 
+            // Get the base URL from the environment variable
+            $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
+
             // Add document URL to each individual client
-            $clientsWithDocumentUrl = $clients->map(function ($client) {
+            $clientsWithDocumentUrl = $clients->map(function ($client) use ($baseURL) {
                 $client->document_url = $client->document
-                    ? Storage::url('uploads/individual_clients/' . $client->document)
+                    ? $baseURL . Storage::url('uploads/individual_clients/' . $client->document)
                     : null;
                 return $client;
             });

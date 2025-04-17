@@ -41,14 +41,17 @@ class CorporateClientsController extends Controller
             // Retrieve all corporate clients with their associated client and corporate type details
             $corporateClients = Corporate_clients::with('client', 'corporateType')->get();
 
+            // Get the base URL from the environment variable
+            $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
+
             // Add certificate and registration URLs to each corporate client
-            $corporateClientsWithUrls = $corporateClients->map(function ($corporateClient) {
+            $corporateClientsWithUrls = $corporateClients->map(function ($corporateClient) use ($baseURL) {
                 $corporateClient->certificate_url = $corporateClient->certificate_of_incorporation
-                    ? Storage::url('uploads/corporate_clients/' . $corporateClient->certificate_of_incorporation)
+                    ? $baseURL . Storage::url('uploads/corporate_clients/' . $corporateClient->certificate_of_incorporation)
                     : null;
 
                 $corporateClient->registration_url = $corporateClient->company_registration
-                    ? Storage::url('uploads/corporate_clients/' . $corporateClient->company_registration)
+                    ? $baseURL . Storage::url('uploads/corporate_clients/' . $corporateClient->company_registration)
                     : null;
 
                 return $corporateClient;
@@ -74,13 +77,16 @@ class CorporateClientsController extends Controller
                 return response()->json(['message' => 'Corporate client not found'], 404);
             }
 
+            // Get the base URL from the environment variable
+            $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
+
             // Add certificate and registration URLs to the corporate client
             $corporateClient->certificate_url = $corporateClient->certificate_of_incorporation
-                ? Storage::url('uploads/corporate_clients/' . $corporateClient->certificate_of_incorporation)
+                ? $baseURL . Storage::url('uploads/corporate_clients/' . $corporateClient->certificate_of_incorporation)
                 : null;
 
             $corporateClient->registration_url = $corporateClient->company_registration
-                ? Storage::url('uploads/corporate_clients/' . $corporateClient->company_registration)
+                ? $baseURL . Storage::url('uploads/corporate_clients/' . $corporateClient->company_registration)
                 : null;
 
             return response()->json([
