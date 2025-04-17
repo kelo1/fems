@@ -169,11 +169,12 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::get('/billing/search/{search}', [BillingController::class, 'search'])->name('search_billitems');
   Route::put('/billing/service_provider/vat_rate/{serviceProviderId}', [BillingController::class, 'updateVATRate']);
   //Protected Invoicing Routes
+  Route::post('/invoicing/all', [InvoicingController::class, 'index'])->name('invoice_all');
   Route::post('/invoicing/create', [InvoicingController::class, 'generateInvoice'])->name('create_invoicing');
   Route::post('/invoicing/generate_invoice_pdf', [InvoicingController::class, 'generateInvoicePDF']);
   Route::get('/invoicing/{id}', [InvoicingController::class, 'show'])->name('invoicing_show');
-  Route::get('/invoicing/service_provider/{serviceProviderId}', [InvoicingController::class, 'invoicingByServiceProvider'])->name('invoicing_by_service_provider');
-  Route::get('/invoicing/client/{clientId}', [InvoicingController::class, 'invoicingByClient'])->name('invoicing_by_client');
+  Route::get('/invoicing/service_provider/{serviceProviderId}', [InvoicingController::class, 'getInvoiceByServiceProvider'])->name('invoicing_by_service_provider');
+  Route::get('/invoicing/client/{clientId}', [InvoicingController::class, 'getInvoiceByClient'])->name('invoicing_by_client');
   Route::put('/invoicing/update/{id}', [InvoicingController::class, 'update'])->name('update_invoicing');
   Route::delete('/invoicing/delete/{id}', [InvoicingController::class, 'destroy'])->name('delete_invoicing');
   Route::get('/invoices/edit/{id}', [InvoicingController::class, 'edit'])->name('edit_invoicing');

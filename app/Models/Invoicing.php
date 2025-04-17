@@ -34,14 +34,14 @@ class Invoicing extends Model
     // Relationship with ServiceProvider
     public function serviceProvider()
     {
-        return $this->belongsTo(ServiceProvider::class);
+        return $this->belongsTo(ServiceProvider::class, 'service_provider_id');
     }
 
     // Relationship with Client
 
     public function client()
     {
-        return $this->belongsTo(Client::class);
+        return $this->belongsTo(Client::class, 'client_id');
     }
     public function equipment()
     {

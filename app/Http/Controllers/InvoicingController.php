@@ -28,28 +28,46 @@ class InvoicingController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $user = Auth::user();
+        try {
+            $user = Auth::user();
 
-        if (!$user) {
-            return response(['message' => 'Unauthorized'], 403);
+            if (!$user) {
+                return response(['message' => 'Unauthorized'], 403);
+            }
+
+            $user_type = $request->user_type;
+
+            if ($user_type == 'FEMS_ADMIN' || $user_type == 'GRA_PERSONNEL') {
+                // Retrieve all invoices with associated client and service provider details
+                $invoicings = Invoicing::with(['client', 'serviceProvider'])->get();
+
+                // Add client details dynamically based on client_type
+                foreach ($invoicings as $invoice) {
+                    $client = Client::find($invoice->client_id);
+
+                    if ($client->client_type == 'CORPORATE') {
+                        $invoice->client_details = Corporate_clients::where('client_id', $client->id)->first();
+                    } else {
+                        $invoice->client_details = Individual_clients::where('client_id', $client->id)->first();
+                    }
+                }
+            } 
+             else {
+                return response(['message' => 'Unauthorized'], 403);
+            }
+
+            \Log::info('Invoices retrieved successfully', ['user_type' => $user_type, 'invoices' => $invoicings]);
+
+            return response(['invoices' => $invoicings], 200);
+        } catch (\Exception $e) {
+            \Log::error('Exception occurred in index', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response(['message' => 'An error occurred while retrieving invoices'], 500);
         }
-
-        $user_type = $request->user_type;
-
-        if ($user_type == 'FEMS_ADMIN' && $user_type == 'GRA_PERSONNEL') {
-            // Check if the user is a service provider
-            $invoicings = Invoicing::all();
-        } 
-        elseif($user_type == 'SERVICE_PROVIDER'){
-            $invoicings = Invoicing::where('service_provider_id', $user->id)->get();
-        } 
-        else{
-
-            return response(['message' => 'Unauthorized'], 403);
-        }    
-
     }
 
     public function generateRandomSequence()
@@ -443,11 +461,24 @@ class InvoicingController extends Controller
     {
         try {
             // Retrieve invoices for the given service provider ID
-            $invoices = Invoicing::where('service_provider_id', $serviceProviderId)->get();
+            $invoices = Invoicing::where('service_provider_id', $serviceProviderId)
+                ->with('client') // Eager load the client relationship
+                ->get();
 
             if ($invoices->isEmpty()) {
                 \Log::info('No invoices found for the service provider', ['service_provider_id' => $serviceProviderId]);
                 return response(['message' => 'No invoices found for the service provider'], 404);
+            }
+
+            // Add client details dynamically based on client_type
+            foreach ($invoices as $invoice) {
+                $client = Client::find($invoice->client_id);
+
+                if ($client->client_type == 'CORPORATE') {
+                    $invoice->client_details = Corporate_clients::where('client_id', $client->id)->first();
+                } else {
+                    $invoice->client_details = Individual_clients::where('client_id', $client->id)->first();
+                }
             }
 
             \Log::info('Invoices retrieved for service provider', ['service_provider_id' => $serviceProviderId, 'invoices' => $invoices]);
@@ -466,11 +497,24 @@ class InvoicingController extends Controller
     {
         try {
             // Retrieve invoices for the given client ID
-            $invoices = Invoicing::where('client_id', $clientId)->get();
+            $invoices = Invoicing::where('client_id', $clientId)
+                ->with('serviceProvider') // Eager load the service provider relationship
+                ->get();
 
             if ($invoices->isEmpty()) {
                 \Log::info('No invoices found for the client', ['client_id' => $clientId]);
                 return response(['message' => 'No invoices found for the client'], 404);
+            }
+
+            // Add client details dynamically based on client_type
+            foreach ($invoices as $invoice) {
+                $client = Client::find($invoice->client_id);
+
+                if ($client->client_type == 'CORPORATE') {
+                    $invoice->client_details = Corporate_clients::where('client_id', $client->id)->first();
+                } else {
+                    $invoice->client_details = Individual_clients::where('client_id', $client->id)->first();
+                }
             }
 
             \Log::info('Invoices retrieved for client', ['client_id' => $clientId, 'invoices' => $invoices]);
