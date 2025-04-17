@@ -149,6 +149,7 @@ class CorporateClientsController extends Controller
                 'client' => $client,
                 'certificate_url' => $certificateUrl,
                 'registration_url' => $registrationUrl,
+                
             ], 201);
         } catch (\Exception $e) {
             \DB::rollBack();
