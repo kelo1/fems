@@ -448,5 +448,50 @@ class EquipmentController extends Controller
         }
     }
 
+    public function checkEquipmentStatus($id)
+    {
+        try {
+            // Retrieve the equipment record by ID
+            $equipment = Equipment::findOrFail($id);
+
+            // Check if the equipment is expired
+            $expiredEquipment = Equipment::where('id', $id)
+                ->where('expiry_date', '<', Carbon::now())
+                ->exists();
+
+            if ($expiredEquipment) {
+                return response()->json([
+                    'equipment_id' => $id,
+                    'equipment_status' => 'Expired',
+                ], 200);
+            }
+
+            // Check if the equipment is expiring soon
+            $expiringSoonEquipment = Equipment::where('id', $id)
+                ->whereBetween('expiry_date', [Carbon::now(), Carbon::now()->addWeek()])
+                ->exists();
+
+            if ($expiringSoonEquipment) {
+                return response()->json([
+                    'equipment_id' => $id,
+                    'equipment_status' => 'Renewal Due Soon',
+                ], 200);
+            }
+
+            // If neither expired nor expiring soon, return Active
+            return response()->json([
+                'equipment_id' => $id,
+                'equipment_status' => 'Active',
+            ], 200);
+        } catch (\Exception $e) {
+            // Log the error
+            \Log::error('Error in checkEquipmentStatus method', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json(['message' => 'An error occurred while checking equipment status'], 500);
+        }
+    }
 
 }

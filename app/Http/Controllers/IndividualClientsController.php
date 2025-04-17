@@ -115,6 +115,7 @@ class IndividualClientsController extends Controller
                 $documentFileName = strtolower($request->document_type) . '_upload_' . $client->id . '_' . Str::slug($request->first_name . ' ' . $request->last_name) . '_' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
                 $file->storeAs('uploads/individual_clients', $documentFileName, 'public');
                 $documentUrl = Storage::url('uploads/individual_clients/' . $documentFileName);
+                
             }
 
             // Store individual client details
