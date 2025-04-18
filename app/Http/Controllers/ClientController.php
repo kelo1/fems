@@ -227,8 +227,6 @@ class ClientController extends Controller
                 'company_email' => 'sometimes|email',
                 'company_phone' => 'sometimes|string',
                 'certificate_of_incorporation' => 'sometimes|file|mimes:pdf,jpg,jpeg,png|max:2048',
-                'company_registration' => 'sometimes|file|mimes:pdf,jpg,jpeg,png|max:2048',
-                'corporate_type_id' => 'sometimes|exists:corporate_types,id',
                 'gps_address' => 'nullable|string', 
             ];
         }
@@ -866,4 +864,100 @@ class ClientController extends Controller
             return response()->json(['message' => 'Invalid client type'], 400);
         }
     }
+
+    public function updateClientUploads(Request $request)
+{
+    try {
+        $user = Auth::user();
+
+        if (!$user) {
+            return response(['message' => 'Unauthorized'], 403);
+        }
+
+        
+        // Validate request
+        $request->validate([
+            'id' => 'required|integer|exists:clients,id',
+            'client_type' => 'required|string|in:INDIVIDUAL,CORPORATE',
+            'files' => 'required',
+            'files.*.upload_type' => 'required|string|in:document,certificate_of_incorporation,company_registration',
+            'files.*.file' => 'required|file|mimes:pdf,jpg,jpeg,png|max:2048',
+        ]);
+
+        $clientId = $request->id;
+        $clientType = strtoupper($request->client_type);
+
+        // Get client
+        $client = Client::find($clientId);
+        if (!$client) {
+            return response()->json(['message' => 'Client not found'], 404);
+        }
+
+        // Match client type
+        if (strtoupper($client->client_type) !== $clientType) {
+            return response()->json(['message' => 'Client type mismatch'], 400);
+        }
+
+        // Separate files and their metadata
+        $fileMeta = $request->input('files');
+        $fileUploads = $request->file('files');
+
+        if ($clientType === 'INDIVIDUAL') {
+            $individualClient = Individual_clients::where('client_id', $clientId)->first();
+
+            if (!$individualClient) {
+                return response()->json(['message' => 'Individual client details not found'], 404);
+            }
+
+            foreach ($fileMeta as $index => $meta) {
+                if (isset($meta['upload_type']) && isset($fileUploads[$index]['file'])) {
+                    $uploadType = $meta['upload_type'];
+                    $file = $fileUploads[$index]['file'];
+
+                    if ($uploadType === 'document') {
+                        $fileName = 'document_upload_' . $clientId . '_' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
+                        $file->storeAs('uploads/individual_clients', $fileName, 'public');
+
+                        $individualClient->update(['document' => $fileName]);
+                    }
+                }
+            }
+
+            return response()->json(['message' => 'Uploads updated successfully for individual client'], 200);
+        }
+
+        if ($clientType === 'CORPORATE') {
+            $corporateClient = Corporate_clients::where('client_id', $clientId)->first();
+
+            if (!$corporateClient) {
+                return response()->json(['message' => 'Corporate client details not found'], 404);
+            }
+
+            foreach ($fileMeta as $index => $meta) {
+                if (isset($meta['upload_type']) && isset($fileUploads[$index]['file'])) {
+                    $uploadType = $meta['upload_type'];
+                    $file = $fileUploads[$index]['file'];
+
+                    $fileName = $uploadType . '_' . $clientId . '_' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
+                    $file->storeAs('uploads/corporate_clients', $fileName, 'public');
+
+                    if ($uploadType === 'certificate_of_incorporation') {
+                        $corporateClient->update(['certificate_of_incorporation' => $fileName]);
+                    } elseif ($uploadType === 'company_registration') {
+                        $corporateClient->update(['company_registration' => $fileName]);
+                    }
+                }
+            }
+
+            return response()->json(['message' => 'Uploads updated successfully for corporate client'], 200);
+        }
+
+        return response()->json(['message' => 'Invalid client type'], 400);
+
+    } catch (\Exception $e) {
+        \Log::error('Error in updateClientUploads', ['error' => $e->getMessage()]);
+        return response()->json(['message' => 'An error occurred while updating uploads', 'error' => $e->getMessage()], 500);
+    }
+}
+
 }

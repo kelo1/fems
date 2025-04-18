@@ -99,7 +99,8 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::post('/client/logout', [ClientController::class, 'logout'])->name('client_logout'); 
   Route::get('/client/uploads/{id}', [ClientController::class, 'getClientUploads'])->name('client_uploads');
   Route::delete('/client/delete_upload/{id}', [ClientController::class, 'deleteClientUpload'])->name('delete_client_upload');
-  
+  Route::post('/client/uploads/update', [ClientController::class, 'updateClientUploads'])->name('update_client_uploads');
+
   //Protected Corporate Client Routes
   Route::get('/client/corporate_clients', [CorporateClientsController::class, 'getCorporateClients'])->name('all_corporate_clients');
   Route::get('/client/corporate_clients/{id}', [CorporateClientsController::class, 'getCorporateClientByID'])->name('corporate_client_by_id');  
