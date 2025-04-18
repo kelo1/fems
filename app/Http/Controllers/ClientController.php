@@ -880,8 +880,8 @@ class ClientController extends Controller
             'id' => 'required|integer|exists:clients,id',
             'client_type' => 'required|string|in:INDIVIDUAL,CORPORATE',
             'files' => 'required',
-            'files.*.upload_type' => 'required|string|in:document,certificate_of_incorporation,company_registration',
-            'files.*.file' => 'required|file|mimes:pdf,jpg,jpeg,png|max:2048',
+           // 'files.*.upload_type' => 'required|string|in:document,certificate_of_incorporation,company_registration',
+           // 'files.*.file' => 'required|file|mimes:pdf,jpg,jpeg,png|max:2048',
         ]);
 
         $clientId = $request->id;
