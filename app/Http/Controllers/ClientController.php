@@ -216,7 +216,7 @@ class ClientController extends Controller
                 'address' => 'sometimes|string',
                 'gps_address' => 'nullable|string',
                 'document_type' => 'sometimes|string|in:PASSPORT,NATIONAL_ID',
-                'document' => 'required_if:document_type,PASSPORT,NATIONAL_ID|file|mimes:pdf,jpg,jpeg,png|max:2048',
+                'document' => 'sometimes:|file|mimes:pdf,jpg,jpeg,png|max:2048',
     
             ];
         } elseif ($isCorporate) {
