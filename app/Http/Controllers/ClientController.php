@@ -436,47 +436,48 @@ class ClientController extends Controller
     //Delete a client
     public function destroy($id)
     {
-    // Authenticate user
-    $user = Auth::user();
+        // Authenticate user
+        $user = Auth::user();
 
-    if (!$user) {
-        return response(['message' => 'Unauthorized'], 403);
-    }
-    
-
-    \Log::info("Deleting client with ID: $id");
-
-    $client = Client::find($id);
-
-    if (!$client) {
-        return response()->json(['message' => 'Client not found'], 404);
-    }
-
-    $isIndividual = strtoupper($client->client_type) === 'INDIVIDUAL';
-    $isCorporate = strtoupper($client->client_type) === 'CORPORATE';
-
-    DB::transaction(function () use ($client, $isIndividual, $isCorporate) {
-        if ($isIndividual) {
-            // Delete from individual_clients table
-            $deleted = DB::table('individual_clients')
-                ->where('client_id', $client->id)
-                ->delete();
-            \Log::info("Deleted from individual_clients: ", ['client_id' => $client->id, 'deleted' => $deleted]);
-        } elseif ($isCorporate) {
-            // Delete from corporate_clients table
-            $deleted = DB::table('corporate_clients')
-                ->where('client_id', $client->id)
-                ->delete();
-            \Log::info("Deleted from corporate_clients: ", ['client_id' => $client->id, 'deleted' => $deleted]);
+        if (!$user) {
+            return response(['message' => 'Unauthorized'], 403);
         }
 
-        // Delete from clients table
-        $client->delete();
-        \Log::info("Deleted client record for ID: {$client->id}");
-    });
+        \Log::info("Soft deleting client with ID: $id");
 
-    return response()->json(['message' => 'Client deleted successfully'], 200);
-    
+        // Find the client
+        $client = Client::find($id);
+
+        if (!$client) {
+            return response()->json(['message' => 'Client not found'], 404);
+        }
+
+        $isIndividual = strtoupper($client->client_type) === 'INDIVIDUAL';
+        $isCorporate = strtoupper($client->client_type) === 'CORPORATE';
+
+        DB::transaction(function () use ($client, $isIndividual, $isCorporate) {
+            if ($isIndividual) {
+                // Soft delete from individual_clients table
+                $individualClient = Individual_clients::where('client_id', $client->id)->first();
+                if ($individualClient) {
+                    $individualClient->delete();
+                    \Log::info("Soft deleted individual client record for ID: {$client->id}");
+                }
+            } elseif ($isCorporate) {
+                // Soft delete from corporate_clients table
+                $corporateClient = Corporate_clients::where('client_id', $client->id)->first();
+                if ($corporateClient) {
+                    $corporateClient->delete();
+                    \Log::info("Soft deleted corporate client record for ID: {$client->id}");
+                }
+            }
+
+            // Soft delete from clients table
+            $client->delete();
+            \Log::info("Soft deleted client record for ID: {$client->id}");
+        });
+
+        return response()->json(['message' => 'Client soft deleted successfully'], 200);
     }
 
 

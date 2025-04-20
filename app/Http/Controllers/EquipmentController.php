@@ -324,10 +324,28 @@ class EquipmentController extends Controller
 
     public function destroy($id)
     {
-        $equipment = Equipment::findOrFail($id);
+        // Authenticate user
+        $user = Auth::user();
+
+        if (!$user) {
+            return response(['message' => 'Unauthorized'], 403);
+        }
+
+        \Log::info("Soft deleting equipment with ID: $id");
+
+        // Find the equipment
+        $equipment = Equipment::find($id);
+
+        if (!$equipment) {
+            return response()->json(['message' => 'Equipment not found'], 404);
+        }
+
+        // Soft delete the equipment
         $equipment->delete();
 
-        return response()->json(['message' => 'Equipment deleted successfully']);
+        \Log::info("Soft deleted equipment record for ID: {$equipment->id}");
+
+        return response()->json(['message' => 'Equipment soft deleted successfully'], 200);
     }
 
     public function checkExpiredEquipment()

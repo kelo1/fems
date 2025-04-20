@@ -400,43 +400,44 @@ class AuthController extends Controller
     {
         try {
             \Log::info('destroy method called', ['id' => $id, 'request_data' => $request->all()]);
-    
+
+            // Validate the request
             $request->validate([
                 'user_type' => ['required', Rule::in(['SERVICE_PROVIDER', 'FSA_AGENT', 'GRA_PERSONNEL'])],
             ]);
-    
+
             // Get the authenticated admin
             $admin = Auth::user();
-    
+
             if (!$admin) {
                 return response()->json(['message' => 'Unauthorized: Admin user not found'], 401);
             }
-    
-            // Get the authenticated user
-            $admin = Auth::user();
-        
+
             // Ensure the authenticated user is a FEMSAdmin
             if (!$admin instanceof FEMSAdmin) {
-                \Log::warning('Unauthorized attempt to update isActive', ['auth_user' => $admin]);
+                \Log::warning('Unauthorized attempt to delete user', ['auth_user' => $admin]);
                 return response()->json(['message' => 'You\'re Unauthorized to perform this action'], 401);
             }
 
             // Determine the user type and find the user
             $user = match (strtoupper($request->user_type)) {
-                'SERVICE_PROVIDER' => ServiceProvider::findOrFail($id),
-                'FSA_AGENT' => FireServiceAgent::findOrFail($id),
-                'GRA_PERSONNEL' => GRA::findOrFail($id),
+                'SERVICE_PROVIDER' => ServiceProvider::find($id),
+                'FSA_AGENT' => FireServiceAgent::find($id),
+                'GRA_PERSONNEL' => GRA::find($id),
             };
-    
-            // Delete the user
+
+            if (!$user) {
+                return response()->json(['message' => 'User not found'], 404);
+            }
+
+            // Perform soft delete
             $user->delete();
-    
-            \Log::info('Successfully deleted user', ['user' => $user]);
-    
-            return response()->json(['message' => 'User deleted successfully']);
-    
+
+            \Log::info('Successfully soft deleted user', ['user' => $user]);
+
+            return response()->json(['message' => 'User soft deleted successfully'], 200);
         } catch (\Exception $e) {
-            \Log::error('Error deleting user', ['error' => $e->getMessage()]);
+            \Log::error('Error soft deleting user', ['error' => $e->getMessage()]);
             return response()->json(['message' => 'An error occurred'], 500);
         }
     }
