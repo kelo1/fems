@@ -134,7 +134,6 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   //Protected Equipment Routes
   Route::post('/equipment/register', [EquipmentController::class, 'store'])->name('register_equipment');
   Route::post('/equipment/massupload', [EquipmentController::class, 'massUpload'])->name('register_equipment_in _mass');
-  Route::get('/equipment/{id}', [EquipmentController::class, 'show'])->name('equipment_show');
   //Route::get('/equipment/{id}/decode_qr_code', [EquipmentController::class, 'decodeQrCode'])->name('equipment_decode_qr_code');
   Route::get('/equipment', [EquipmentController::class, 'index'])->name('equipment');
   Route::put('/equipment/{id}', [EquipmentController::class, 'update'])->name('equipment_update');

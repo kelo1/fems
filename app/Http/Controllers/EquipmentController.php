@@ -9,6 +9,8 @@ use App\Models\ServiceProvider;
 use App\Models\Client;
 use App\Models\QRCode;
 use App\Models\FEMSAdmin;
+use App\Models\Individual_clients;
+use App\Models\Corporate_clients;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -567,8 +569,7 @@ class EquipmentController extends Controller
     }
 
     public function getEquipmentByID($id)
-    {     
-
+    {
         try {
             // Retrieve the equipment record with its associated client, service provider, and filtered activities
             $equipment = Equipment::with([
@@ -585,18 +586,37 @@ class EquipmentController extends Controller
 
             // Hide the equipment_clients and equipment_service_providers relationships in the equipment object
             $equipment->makeHidden(['equipmentClients', 'equipmentServiceProviders']);
-            
+
             // Determine the equipment status
             $equipmentStatus = $this->determineEquipmentStatus($id);
+
+            // Add client names to the clients object
+            $clients = $equipment->equipmentClients->map(function ($client) {
+                $clientDetails = Client::find($client->client_id);
+                if ($clientDetails->client_type === 'INDIVIDUAL') {
+                    $individualClient = Individual_clients::where('client_id', $client->client_id)->first();
+                    $client->name = $individualClient ? $individualClient->first_name . ' ' . $individualClient->last_name : null;
+                } elseif ($clientDetails->client_type === 'CORPORATE') {
+                    $corporateClient = Corporate_clients::where('client_id', $client->client_id)->first();
+                    $client->name = $corporateClient ? $corporateClient->company_name : null;
+                }
+                return $client;
+            });
+
+            // Add service provider names to the service_providers object
+            $serviceProviders = $equipment->equipmentServiceProviders->map(function ($serviceProvider) {
+                $serviceProviderDetails = ServiceProvider::find($serviceProvider->service_provider_id);
+                $serviceProvider->name = $serviceProviderDetails ? $serviceProviderDetails->name : null;
+                return $serviceProvider;
+            });
 
             // Format the response as an associative array
             $response = [
                 'equipment' => $equipment,
-                'clients' => $equipment->equipmentClients,
-                'service_providers' => $equipment->equipmentServiceProviders,
+                'clients' => $clients,
+                'service_providers' => $serviceProviders,
                 'equipment_status' => $equipmentStatus,
                 'activities' => $equipment->equipmentActivities,
-                
             ];
 
             return response()->json(['message' => 'Equipment retrieved successfully', 'data' => $response], 200);
@@ -611,7 +631,6 @@ class EquipmentController extends Controller
         }
     }
 
-
     public function getEquipmentBySerialNumber($serial_number)
     {
         try {
@@ -623,8 +642,8 @@ class EquipmentController extends Controller
                 'equipmentServiceProviders' => function ($query) {
                     $query->where('status_service_provider', 1);
                 },
-                 'equipmentActivities' => function ($query) use ($serial_number) {
-                    $query->where('equipment_serial_number', $serial_number); // Filter activities by equipment_id
+                'equipmentActivities' => function ($query) use ($serial_number) {
+                    $query->where('equipment_serial_number', $serial_number); // Filter activities by equipment_serial_number
                 }
             ])->where('serial_number', $serial_number)->first();
 
@@ -634,8 +653,28 @@ class EquipmentController extends Controller
 
             $id = Equipment::where('serial_number', $serial_number)->value('id');
 
-              // Determine the equipment status
-              $equipmentStatus = $this->determineEquipmentStatus($id);
+            // Determine the equipment status
+            $equipmentStatus = $this->determineEquipmentStatus($id);
+
+            // Add client names to the clients object
+            $clients = $equipment->equipmentClients->map(function ($client) {
+                $clientDetails = Client::find($client->client_id);
+                if ($clientDetails->client_type === 'INDIVIDUAL') {
+                    $individualClient = Individual_clients::where('client_id', $client->client_id)->first();
+                    $client->name = $individualClient ? $individualClient->first_name . ' ' . $individualClient->last_name : null;
+                } elseif ($clientDetails->client_type === 'CORPORATE') {
+                    $corporateClient = Corporate_clients::where('client_id', $client->client_id)->first();
+                    $client->name = $corporateClient ? $corporateClient->company_name : null;
+                }
+                return $client;
+            });
+
+            // Add service provider names to the service_providers object
+            $serviceProviders = $equipment->equipmentServiceProviders->map(function ($serviceProvider) {
+                $serviceProviderDetails = ServiceProvider::find($serviceProvider->service_provider_id);
+                $serviceProvider->name = $serviceProviderDetails ? $serviceProviderDetails->name : null;
+                return $serviceProvider;
+            });
 
             // Hide the equipment_clients and equipment_service_providers relationships in the equipment object
             $equipment->makeHidden(['equipmentClients', 'equipmentServiceProviders']);
@@ -643,12 +682,10 @@ class EquipmentController extends Controller
             // Format the response as an associative array
             $response = [
                 'equipment' => $equipment,
-                'clients' => $equipment->equipmentClients,
-                'service_providers' => $equipment->equipmentServiceProviders,
+                'clients' => $clients,
+                'service_providers' => $serviceProviders,
                 'equipment_status' => $equipmentStatus,
                 'activities' => $equipment->equipmentActivities,
-                
-               
             ];
 
             return response()->json(['message' => 'Equipment retrieved successfully', 'data' => $response], 200);
