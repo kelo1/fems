@@ -47,7 +47,7 @@ class Equipment extends Model
 
     public function qrCode()
     {
-        return $this->hasOne(QRCode::class, 'serial_number', 'serial_number');
+        return $this->hasOne(QRCode::class, 'serial_number');
     }
 
     // Relationship with EquipmentClient

@@ -594,8 +594,9 @@ class EquipmentController extends Controller
                 'equipment' => $equipment,
                 'clients' => $equipment->equipmentClients,
                 'service_providers' => $equipment->equipmentServiceProviders,
-                'activities' => $equipment->equipmentActivities,
                 'equipment_status' => $equipmentStatus,
+                'activities' => $equipment->equipmentActivities,
+                
             ];
 
             return response()->json(['message' => 'Equipment retrieved successfully', 'data' => $response], 200);
@@ -621,6 +622,9 @@ class EquipmentController extends Controller
                 },
                 'equipmentServiceProviders' => function ($query) {
                     $query->where('status_service_provider', 1);
+                },
+                 'equipmentActivities' => function ($query) use ($serial_number) {
+                    $query->where('equipment_serial_number', $serial_number); // Filter activities by equipment_id
                 }
             ])->where('serial_number', $serial_number)->first();
 
@@ -642,6 +646,9 @@ class EquipmentController extends Controller
                 'clients' => $equipment->equipmentClients,
                 'service_providers' => $equipment->equipmentServiceProviders,
                 'equipment_status' => $equipmentStatus,
+                'activities' => $equipment->equipmentActivities,
+                
+               
             ];
 
             return response()->json(['message' => 'Equipment retrieved successfully', 'data' => $response], 200);
