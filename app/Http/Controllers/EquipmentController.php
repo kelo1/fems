@@ -465,7 +465,89 @@ class EquipmentController extends Controller
         }
     }
 
-   
+    public function update(Request $request, $id)
+    {
+        try {
+            // Authenticate the user
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            // Validate the request
+            $request->validate([
+                'name' => 'sometimes|string|max:255',
+                'description' => 'sometimes|string',
+                'service_provider_id' => 'nullable|integer|exists:service_providers,id',
+                'client_id' => 'nullable|integer|exists:clients,id',
+                'date_of_manufacturing' => 'sometimes|date',
+                'expiry_date' => 'sometimes|date|after:date_of_manufacturing',
+            ]);
+
+            // Retrieve the equipment record
+            $equipment = Equipment::findOrFail($id);
+
+            // Update the equipment details
+            $equipment->update($request->only([
+                'name',
+                'description',
+                'date_of_manufacturing',
+                'expiry_date',
+            ]));
+
+            // Update or add client association if provided
+            if ($request->has('client_id')) {
+                // Deactivate the current client record
+                \DB::table('equipment_clients')
+                    ->where('equipment_id', $id)
+                    ->where('status_client', 1)
+                    ->update(['status_client' => 0]);
+
+                // Insert a new client record
+                \DB::table('equipment_clients')->insert([
+                    'equipment_id' => $id,
+                    'serial_number' => $equipment->serial_number,
+                    'client_id' => $request->client_id,
+                    'status_client' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            // Update or add service provider association if provided
+            if ($request->has('service_provider_id')) {
+                // Deactivate the current service provider record
+                \DB::table('equipment_service_providers')
+                    ->where('equipment_id', $id)
+                    ->where('status_service_provider', 1)
+                    ->update(['status_service_provider' => 0]);
+
+                // Insert a new service provider record
+                \DB::table('equipment_service_providers')->insert([
+                    'equipment_id' => $id,
+                    'serial_number' => $equipment->serial_number,
+                    'service_provider_id' => $request->service_provider_id,
+                    'status_service_provider' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            return response()->json([
+                'message' => 'Equipment updated successfully',
+                'data' => $equipment,
+            ], 200);
+        } catch (\Exception $e) {
+            // Log the error
+            \Log::error('Error in update method', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json(['message' => 'An error occurred while updating the equipment'], 500);
+        }
+    }
+
     public function getEquipmentByID($id)
     {     
 
