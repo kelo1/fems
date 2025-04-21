@@ -31,7 +31,7 @@ class Equipment extends Model
         parent::boot();
 
         static::creating(function ($model) {
-            $model->serial_number = (string) Str::uuid();
+            $model->serial_number = 'EQU-' . strtoupper(uniqid());
         });
     }
 

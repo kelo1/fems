@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\EquipmentActivity;
 use App\Models\Equipment;
+use App\Models\ServiceProviderDevice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -18,21 +19,38 @@ class EquipmentActivityController extends Controller
 
     public function store(Request $request)
     {
-        $user = Auth::user();
-
-        if (!$user) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $request->validate([
-            'activity' => 'required|string|max:255',
-            'next_maintenance_date' => 'nullable|date',
-            'service_provider_id' => 'nullable|integer|exists:service_providers,id',
-            'client_id' => 'nullable|integer|exists:clients,id',
-            'equipment_id' => 'required|integer|exists:equipment,id',
-        ]);
-
         try {
+            // Check if the user is authenticated
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            // Validate the request
+            $request->validate([
+                'device_serial_number' => 'required|string|exists:service_provider_devices,device_serial_number',
+                'activity' => 'required|string',
+                'next_maintenance_date' => 'nullable|date',
+                'service_provider_id' => 'nullable|exists:service_providers,id',
+                'client_id' => 'nullable|exists:clients,id',
+                'equipment_id' => 'nullable|exists:equipment,id'
+            ]);
+
+            // Check if the device_serial_number exists in ServiceProviderDevices
+            $deviceExists = ServiceProviderDevice::where('device_serial_number', $request->device_serial_number)->exists();
+
+            if (!$deviceExists) {
+                return response()->json(['message' => 'The device could not be validated, please contact FEMS Admin'], 403);
+            }
+
+            // Check if the equipment is active
+            $equipment = Equipment::find($request->equipment_id);
+
+            if ($equipment && $equipment->isActive == 0) {
+                return response()->json(['message' => 'The equipment is not verified, you cannot create an activity. Please contact FEMS Admin'], 403);
+            }
+
             \DB::beginTransaction();
 
             // Create the equipment activity
@@ -48,7 +66,7 @@ class EquipmentActivityController extends Controller
             ]);
 
             // Update the parent Equipment table if next_maintenance_date is provided
-            if ($request->next_maintenance_date) {
+            if ($request->next_maintenance_date !== null) {
                 $equipment = Equipment::findOrFail($request->equipment_id);
                 $equipment->update([
                     'expiry_date' => $request->next_maintenance_date,
@@ -58,48 +76,30 @@ class EquipmentActivityController extends Controller
             \DB::commit();
 
             return response()->json(['message' => 'Equipment activity created successfully', 'activity' => $activity], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Rollback the transaction and log validation errors
+            \DB::rollBack();
+            \Log::error('Validation error in store method', [
+                'errors' => $e->errors(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            // Rollback the transaction and log model not found errors
+            \DB::rollBack();
+            \Log::error('Model not found in store method', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['message' => 'Resource not found', 'error' => $e->getMessage()], 404);
         } catch (\Exception $e) {
+            // Rollback the transaction and log general errors
             \DB::rollBack();
             \Log::error('Error creating equipment activity', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            return response()->json(['message' => 'Failed to create equipment activity'], 500);
+            return response()->json(['message' => 'Failed to create equipment activity', 'error' => $e->getMessage()], 500);
         }
-    }
-
-    public function show($id)
-    {
-        $activity = EquipmentActivity::with(['client', 'serviceProvider'])->findOrFail($id);
-        return response()->json(['activity' => $activity], 200);
-    }
-
-    public function update(Request $request, $id)
-    {
-        $activity = EquipmentActivity::findOrFail($id);
-
-        $request->validate([
-            'activity' => 'sometimes|string|max:255',
-            'next_maintenance_date' => 'nullable|date',
-            'service_provider_id' => 'nullable|integer|exists:service_providers,id',
-            'client_id' => 'nullable|integer|exists:clients,id',
-        ]);
-
-        $activity->update($request->only([
-            'activity',
-            'next_maintenance_date',
-            'service_provider_id',
-            'client_id',
-        ]));
-
-        return response()->json(['message' => 'Equipment activity updated successfully', 'activity' => $activity], 200);
-    }
-
-    public function destroy($id)
-    {
-        $activity = EquipmentActivity::findOrFail($id);
-        $activity->delete();
-
-        return response()->json(['message' => 'Equipment activity deleted successfully'], 200);
     }
 }

@@ -19,5 +19,6 @@ class DatabaseSeeder extends Seeder
         $this->call(CorporateTypeSeeder::class);
         $this->call(LicenseTypeSeeder::class);
         $this->call(UserTypeSeeder::class);
+        $this->call(ServiceProviderDeviceSeeder::class);
     }
 }

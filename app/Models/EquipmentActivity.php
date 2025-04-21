@@ -4,20 +4,18 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Laravel\Sanctum\HasApiTokens;
 
 class EquipmentActivity extends Model
 {
-    use HasFactory, HasApiTokens;
+    use HasFactory;
 
     protected $fillable = [
         'activity',
         'next_maintenance_date',
         'service_provider_id',
         'client_id',
-        'created_by',
-        'device_serial_number',
         'equipment_id',
+        'device_serial_number',
         'created_by',
         'created_by_type',
     ];
@@ -38,5 +36,11 @@ class EquipmentActivity extends Model
     public function equipment()
     {
         return $this->belongsTo(Equipment::class, 'equipment_id');
+    }
+
+    // Relationship with the ServiceProviderDevice model
+    public function serviceProviderDevice()
+    {
+        return $this->belongsTo(ServiceProviderDevice::class, 'device_serial_number', 'device_serial_number');
     }
 }

@@ -22,6 +22,7 @@ use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CustomerTypeController;
 use App\Http\Controllers\InvoicingController;
 use App\Http\Controllers\EquipmentActivityController;
+use App\Http\Controllers\ServiceProviderDevicesController;
 
 
 /*
@@ -184,9 +185,11 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   //Protected Equipment Activity Routes
   Route::get('/equipment_activity/all', [EquipmentActivityController::class, 'index'])->name('all_equipment_activities');
   Route::post('/equipment_activity/create', [EquipmentActivityController::class, 'store'])->name('create_equipment_activity');
-  Route::get('/equipment_activity/{id}', [EquipmentActivityController::class, 'show'])->name('equipment_activity_show');
-  Route::put('/equipment_activity/update/{id}', [EquipmentActivityController::class, 'update'])->name('update_equipment_activity');
-  Route::delete('/equipment_activity/delete/{id}', [EquipmentActivityController::class, 'destroy'])->name('delete_equipment_activity');
+  
+  //Protected Service Provider Devices Routes
+  Route::get('/service_provider_device/all', [ServiceProviderDevicesController::class, 'index'])->name('all_service_provider_devices');
+  Route::post('/service_provider_device/create', [ServiceProviderDevicesController::class, 'store'])->name('create_service_provider_device');
+  Route::put('/service_provider_device/update/{id}', [ServiceProviderDevicesController::class, 'update'])->name('update_service_provider_device');
 });
 
 // Route::middleware('auth:sanctum')->get('/user', function (Request $request) {

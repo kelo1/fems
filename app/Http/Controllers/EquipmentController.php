@@ -234,11 +234,7 @@ class EquipmentController extends Controller
         }
     }
 
-    public function show($id)
-    {
-        $equipment = Equipment::with('serviceProvider', 'client', 'serial_number')->findOrFail($id);
-        return response()->json($equipment);
-    }
+
 
     public function getEquipmentByServiceProvider($service_provider_id)
     {
@@ -251,33 +247,68 @@ class EquipmentController extends Controller
                 'equipmentServiceProviders' => function ($query) {
                     $query->where('status_service_provider', 1); // Only active service providers
                 },
-                'equipmentActivities' // Include all activities
-            ])->whereHas('equipmentServiceProviders', function ($query) use ($service_provider_id) {
-                $query->where('service_provider_id', $service_provider_id);
-            })->get();
+                'equipmentActivities' => function ($query) use ($id) {
+                    $query->where('equipment_id', $id); // Filter activities by equipment_id
+                }
+            ])->findOrFail($id);
 
-            if ($equipment->isEmpty()) {
-                return response()->json(['message' => 'No equipment found for the specified service provider'], 404);
-            }
+            // Hide the equipment_clients and equipment_service_providers relationships in the equipment object
+            $equipment->makeHidden(['equipmentClients', 'equipmentServiceProviders', 'equipmentActivities']);
 
-            // Add equipmentStatus to each equipment record
-            $equipmentWithStatus = $equipment->map(function ($item) {
-                $item->equipment_status = $this->determineEquipmentStatus($item->id);
-                return $item;
+            // Determine the equipment status
+            $equipmentStatus = $this->determineEquipmentStatus($id);
+
+            // Add client names to the clients object
+            $clients = $equipment->equipmentClients->map(function ($client) {
+                $clientDetails = Client::find($client->client_id);
+                if ($clientDetails->client_type === 'INDIVIDUAL') {
+                    $individualClient = Individual_clients::where('client_id', $client->client_id)->first();
+                    $client->name = $individualClient ? $individualClient->first_name . ' ' . $individualClient->last_name : null;
+                } elseif ($clientDetails->client_type === 'CORPORATE') {
+                    $corporateClient = Corporate_clients::where('client_id', $client->client_id)->first();
+                    $client->name = $corporateClient ? $corporateClient->company_name : null;
+                }
+                return $client;
             });
 
-            return response()->json([
-                'message' => 'Equipment retrieved successfully',
-                'data' => $equipmentWithStatus,
-            ], 200);
+            // Add service provider names to the service_providers object
+            $serviceProviders = $equipment->equipmentServiceProviders->map(function ($serviceProvider) {
+                $serviceProviderDetails = ServiceProvider::find($serviceProvider->service_provider_id);
+                $serviceProvider->name = $serviceProviderDetails ? $serviceProviderDetails->name : null;
+                return $serviceProvider;
+            });
+
+            // Add service provider and client names to the activities
+        $activities = $equipment->equipmentActivities->map(function ($activity) {
+            $serviceProvider = ServiceProvider::find($activity->service_provider_id);
+            $client = Client::find($activity->client_id);
+
+            $activity->service_provider_name = $serviceProvider ? $serviceProvider->name : null;
+            $activity->client_name = $client ? ($client->client_type === 'INDIVIDUAL'
+                ? Individual_clients::where('client_id', $client->id)->value('first_name') . ' ' . Individual_clients::where('client_id', $client->id)->value('last_name')
+                : Corporate_clients::where('client_id', $client->id)->value('company_name')) : null;
+
+            return $activity;
+        });
+
+            // Format the response as an associative array
+            $response = [
+                'equipment' => $equipment,
+                'clients' => $clients,
+                'service_providers' => $serviceProviders,
+                'equipment_status' => $equipmentStatus,
+                'activities' => $equipment->equipmentActivities,
+            ];
+
+            return response()->json(['message' => 'Equipment retrieved successfully', 'data' => $response], 200);
         } catch (\Exception $e) {
             // Log the error
-            \Log::error('Error in getEquipmentByServiceProvider method', [
+            \Log::error('Error in getEquipmentByID method', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return response()->json(['message' => 'An error occurred while retrieving equipment'], 500);
+            return response()->json(['message' => 'An error occurred while retrieving the equipment'], 500);
         }
     }
 
@@ -288,39 +319,72 @@ class EquipmentController extends Controller
             $equipment = Equipment::with([
                 'equipmentClients' => function ($query) {
                     $query->where('status_client', 1); // Only active clients
-                },
+                }, 
                 'equipmentServiceProviders' => function ($query) {
                     $query->where('status_service_provider', 1); // Only active service providers
                 },
-                'equipmentActivities' => function ($query) use ($client_id) {
-                    $query->where('client_id', $client_id); // Filter activities by client_id
+                'equipmentActivities' => function ($query) use ($id) {
+                    $query->where('equipment_id', $id); // Filter activities by equipment_id
                 }
-            ])->whereHas('equipmentClients', function ($query) use ($client_id) {
-                $query->where('client_id', $client_id);
-            })->get();
+            ])->findOrFail($id);
 
-            if ($equipment->isEmpty()) {
-                return response()->json(['message' => 'No equipment found for the specified client'], 404);
-            }
+            // Hide the equipment_clients and equipment_service_providers relationships in the equipment object
+            $equipment->makeHidden(['equipmentClients', 'equipmentServiceProviders', 'equipmentActivities']);
 
-            // Add equipmentStatus to each equipment record
-            $equipmentWithStatus = $equipment->map(function ($item) {
-                $item->equipment_status = $this->determineEquipmentStatus($item->id);
-                return $item;
+            // Determine the equipment status
+            $equipmentStatus = $this->determineEquipmentStatus($id);
+
+            // Add client names to the clients object
+            $clients = $equipment->equipmentClients->map(function ($client) {
+                $clientDetails = Client::find($client->client_id);
+                if ($clientDetails->client_type === 'INDIVIDUAL') {
+                    $individualClient = Individual_clients::where('client_id', $client->client_id)->first();
+                    $client->name = $individualClient ? $individualClient->first_name . ' ' . $individualClient->last_name : null;
+                } elseif ($clientDetails->client_type === 'CORPORATE') {
+                    $corporateClient = Corporate_clients::where('client_id', $client->client_id)->first();
+                    $client->name = $corporateClient ? $corporateClient->company_name : null;
+                }
+                return $client;
             });
 
-            return response()->json([
-                'message' => 'Equipment retrieved successfully',
-                'data' => $equipmentWithStatus,
-            ], 200);
+            // Add service provider names to the service_providers object
+            $serviceProviders = $equipment->equipmentServiceProviders->map(function ($serviceProvider) {
+                $serviceProviderDetails = ServiceProvider::find($serviceProvider->service_provider_id);
+                $serviceProvider->name = $serviceProviderDetails ? $serviceProviderDetails->name : null;
+                return $serviceProvider;
+            });
+
+            // Add service provider and client names to the activities
+        $activities = $equipment->equipmentActivities->map(function ($activity) {
+            $serviceProvider = ServiceProvider::find($activity->service_provider_id);
+            $client = Client::find($activity->client_id);
+
+            $activity->service_provider_name = $serviceProvider ? $serviceProvider->name : null;
+            $activity->client_name = $client ? ($client->client_type === 'INDIVIDUAL'
+                ? Individual_clients::where('client_id', $client->id)->value('first_name') . ' ' . Individual_clients::where('client_id', $client->id)->value('last_name')
+                : Corporate_clients::where('client_id', $client->id)->value('company_name')) : null;
+
+            return $activity;
+        });
+
+            // Format the response as an associative array
+            $response = [
+                'equipment' => $equipment,
+                'clients' => $clients,
+                'service_providers' => $serviceProviders,
+                'equipment_status' => $equipmentStatus,
+                'activities' => $equipment->equipmentActivities,
+            ];
+
+            return response()->json(['message' => 'Equipment retrieved successfully', 'data' => $response], 200);
         } catch (\Exception $e) {
             // Log the error
-            \Log::error('Error in getEquipmentByClient method', [
+            \Log::error('Error in getEquipmentByID method', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return response()->json(['message' => 'An error occurred while retrieving equipment'], 500);
+            return response()->json(['message' => 'An error occurred while retrieving the equipment'], 500);
         }
     }
 
@@ -585,7 +649,7 @@ class EquipmentController extends Controller
             ])->findOrFail($id);
 
             // Hide the equipment_clients and equipment_service_providers relationships in the equipment object
-            $equipment->makeHidden(['equipmentClients', 'equipmentServiceProviders']);
+            $equipment->makeHidden(['equipmentClients', 'equipmentServiceProviders', 'equipmentActivities']);
 
             // Determine the equipment status
             $equipmentStatus = $this->determineEquipmentStatus($id);
@@ -609,6 +673,19 @@ class EquipmentController extends Controller
                 $serviceProvider->name = $serviceProviderDetails ? $serviceProviderDetails->name : null;
                 return $serviceProvider;
             });
+
+            // Add service provider and client names to the activities
+        $activities = $equipment->equipmentActivities->map(function ($activity) {
+            $serviceProvider = ServiceProvider::find($activity->service_provider_id);
+            $client = Client::find($activity->client_id);
+
+            $activity->service_provider_name = $serviceProvider ? $serviceProvider->name : null;
+            $activity->client_name = $client ? ($client->client_type === 'INDIVIDUAL'
+                ? Individual_clients::where('client_id', $client->id)->value('first_name') . ' ' . Individual_clients::where('client_id', $client->id)->value('last_name')
+                : Corporate_clients::where('client_id', $client->id)->value('company_name')) : null;
+
+            return $activity;
+        });
 
             // Format the response as an associative array
             $response = [
@@ -676,8 +753,21 @@ class EquipmentController extends Controller
                 return $serviceProvider;
             });
 
+                 // Add service provider and client names to the activities
+        $activities = $equipment->equipmentActivities->map(function ($activity) {
+            $serviceProvider = ServiceProvider::find($activity->service_provider_id);
+            $client = Client::find($activity->client_id);
+
+            $activity->service_provider_name = $serviceProvider ? $serviceProvider->name : null;
+            $activity->client_name = $client ? ($client->client_type === 'INDIVIDUAL'
+                ? Individual_clients::where('client_id', $client->id)->value('first_name') . ' ' . Individual_clients::where('client_id', $client->id)->value('last_name')
+                : Corporate_clients::where('client_id', $client->id)->value('company_name')) : null;
+
+            return $activity;
+        });
+
             // Hide the equipment_clients and equipment_service_providers relationships in the equipment object
-            $equipment->makeHidden(['equipmentClients', 'equipmentServiceProviders']);
+            $equipment->makeHidden(['equipmentClients', 'equipmentServiceProviders', 'equipmentActivities']);
 
             // Format the response as an associative array
             $response = [
