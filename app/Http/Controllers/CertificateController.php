@@ -278,7 +278,7 @@ class CertificateController extends Controller
             }
 
             // Retrieve certificates for the given client_id
-            $certificates = Certificate::with('certificateType', 'fireServiceAgent')
+            $certificates = Certificate::with('certificateType', 'fireServiceAgent', 'client')
                 ->where('client_id', $client_id)
                 ->get();
 
@@ -328,7 +328,7 @@ class CertificateController extends Controller
             }
 
             // Retrieve the certificate by ID
-            $certificate = Certificate::with('certificateType', 'fireServiceAgent')
+            $certificate = Certificate::with('certificateType', 'fireServiceAgent', 'client')
                 ->findOrFail($id);
 
             // Add isVerified status to the certificate
@@ -363,7 +363,7 @@ class CertificateController extends Controller
             }
 
             // Retrieve certificates for the given certificate_type_id
-            $certificates = Certificate::with('certificateType', 'fireServiceAgent')
+            $certificates = Certificate::with('certificateType', 'fireServiceAgent', 'client')
                 ->where('certificate_id', $certificate_type_id)
                 ->get();
 

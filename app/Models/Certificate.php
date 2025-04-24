@@ -30,4 +30,9 @@ class Certificate extends Model
     {
         return $this->belongsTo(FireServiceAgent::class, 'fsa_id');
     }
+
+    public function client()
+    {
+        return $this->belongsTo(Client::class, 'client_id');
+    }
 }
