@@ -1,0 +1,393 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Certificate;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use App\Models\CertificateType;
+use App\Models\FireServiceAgent;
+use App\Models\Client;
+use App\Models\FEMSAdmin;
+use Illuminate\Support\Facades\Auth;
+
+
+class CertificateController extends Controller
+{
+    public function index()
+    {
+        // Verify if the user is authenticated
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        // Check if the user has the required role
+        if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        
+
+        $certificates = Certificate::with('certificateType', 'fireServiceAgent')->get();
+        return response()->json(['data' => $certificates], 200);
+    }
+
+    public function store(Request $request)
+    {
+        // Verify if the user is authenticated
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        // Check if the user has the required role
+        if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        try {
+            // Validate the request
+            $request->validate([
+                'certificate_id' => 'required|exists:certificate_types,id', // Certificate type must exist
+                'client_id' => 'required|exists:clients,id', // Client must exist
+                'fsa_id' => 'required|exists:fire_service_agents,id', // FSA is required
+                'certificate_upload' => 'required|file|mimes:pdf,jpg,jpeg,png|max:2048', // File upload validation
+            ]);
+
+            // Handle the file upload
+            if ($request->hasFile('certificate_upload')) {
+                $file = $request->file('certificate_upload');
+
+                // Fetch the certificate type name from the CertificateType model
+                $certificateType = CertificateType::find($request->certificate_id);
+                if (!$certificateType) {
+                    return response()->json(['message' => 'Invalid certificate type'], 400);
+                }
+
+                $certificateTypeName = CertificateType::where('id', $request->certificate_id)->value('certificate_name');
+                $clientType = Client::where('id', $request->client_id)->value('client_type');
+                if ($clientType === 'INDIVIDUAL') {
+                    $clientName = \DB::table('individual_clients')->where('client_id', $request->client_id)->value('first_name');
+                } elseif ($clientType === 'CORPORATE') {
+                    $clientName = \DB::table('corporate_clients')->where('client_id', $request->client_id)->value('company_name');
+                } else {
+                    $clientName = 'unknown_client';
+                }
+                $fileName = $certificateTypeName . '_' . $clientName . '_' . $request->client_id . '_' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
+                $filePath = $file->storeAs('certificates', $fileName, 'public'); // Store in the 'public' disk
+                $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
+
+                // Generate the full URL for the uploaded file
+                $documentUrl = $baseURL. Storage::url($filePath);
+            } else {
+                return response()->json(['message' => 'Certificate upload is required'], 400);
+            }
+
+            // check if certificate_id already exists for the client
+            $existingCertificate = Certificate::where('client_id', $request->client_id)
+                ->where('certificate_id', $request->certificate_id)
+                ->first();
+            if ($existingCertificate) {
+                return response()->json(['message' => 'This type of certificate already exists for this client'], 400);
+            }
+
+            // Create the certificate record
+            $certificate = Certificate::create([
+                'certificate_id' => $request->certificate_id,
+                'client_id' => $request->client_id,
+                'fsa_id' => $request->fsa_id,
+                'created_by' => $user->id,
+                'created_by_type' => get_class($user),
+                'certificate_upload' => $documentUrl, // Store the file path in the database
+            ]);
+
+            // Add the file URL to the response
+            $certificate->certificate_upload_url = $documentUrl;
+
+            return response()->json([
+                'message' => 'Certificate created successfully',
+                'data' => $certificate,
+                'certificate_upload_url' => $documentUrl,
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Handle validation errors
+            \Log::error('Validation error in CertificatesController@store', [
+                'errors' => $e->errors(),
+            ]);
+            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            // Handle general errors
+            \Log::error('Error in CertificatesController@store', [
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['message' => 'An error occurred while creating the certificate', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function update(Request $request, $id)
+    {
+
+         // Verify if the user is authenticated
+         $user = Auth::user();
+         if (!$user) {
+             return response()->json(['message' => 'Unauthorized'], 401);
+         }
+ 
+         // Check if the user has the required role
+         if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
+             return response()->json(['message' => 'Unauthorized'], 403);
+         }
+         
+
+        // Verify if the user is authenticated
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        // Check if the user has the required role
+        if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        try {
+            // Find the certificate
+            $certificate = Certificate::findOrFail($id);
+
+            // Validate the request
+            $request->validate([
+                'certificate_id' => 'sometimes|exists:certificate_types,id',
+                'client_id' => 'sometimes|exists:clients,id',
+                'fsa_id' => 'nullable|exists:fire_service_agents,id',
+                'created_by' => 'sometimes|integer',
+                'created_by_type' => 'sometimes|string',
+                'certificate_upload' => 'sometimes|file|mimes:pdf,jpg,jpeg,png|max:2048', // File upload validation
+            ]);
+
+            // Handle the file upload if provided
+            if ($request->hasFile('certificate_upload')) {
+                $file = $request->file('certificate_upload');
+
+                // Fetch the certificate type name
+                $certificateTypeName = CertificateType::where('id', $request->certificate_id ?? $certificate->certificate_id)->value('certificate_name') ?? 'certificate';
+
+                // Determine the client name based on client type
+                $clientType = Client::where('id', $request->client_id ?? $certificate->client_id)->value('client_type');
+                if ($clientType === 'INDIVIDUAL') {
+                    $clientName = \DB::table('individual_clients')->where('client_id', $request->client_id ?? $certificate->client_id)->value('first_name');
+                } elseif ($clientType === 'CORPORATE') {
+                    $clientName = \DB::table('corporate_clients')->where('client_id', $request->client_id ?? $certificate->client_id)->value('company_name');
+                } else {
+                    $clientName = 'unknown_client';
+                }
+
+                // Generate the file name and store the file
+                $fileName = $certificateTypeName . '_' . $clientName . '_' . ($request->client_id ?? $certificate->client_id) . '_' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
+                $filePath = $file->storeAs('certificates', $fileName, 'public'); // Store in the 'public' disk
+                $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
+                // Generate the full URL for the uploaded file
+                $documentUrl = $baseURL. Storage::url($filePath);
+
+                // Update the certificate record with the new file path
+                $certificate->update([
+                    'certificate_upload' => $documentUrl,
+                ]);
+            }
+
+            // Update the certificate record with other fields
+            $certificate->update([
+                'certificate_id' => $request->certificate_id ?? $certificate->certificate_id,
+                'client_id' => $request->client_id ?? $certificate->client_id,
+                'fsa_id' => $request->fsa_id ?? $certificate->fsa_id,
+                'created_by' => $user->id,
+                'created_by_type' => get_class($user),
+            ]);
+
+            // Add the file URL to the response if a new file was uploaded
+            if (isset($documentUrl)) {
+                $certificate->certificate_upload_url = $documentUrl;
+            }
+
+            return response()->json([
+                'message' => 'Certificate updated successfully',
+                'data' => $certificate,
+                'certificate_upload_url' => $documentUrl ?? null,
+            ], 200);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Handle validation errors
+            \Log::error('Validation error in CertificatesController@update', [
+                'errors' => $e->errors(),
+            ]);
+            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            // Handle general errors
+            \Log::error('Error in CertificatesController@update', [
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['message' => 'An error occurred while updating the certificate', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            // Find the certificate
+            $certificate = Certificate::findOrFail($id);
+
+            // Soft delete the certificate
+            $certificate->delete();
+
+            return response()->json(['message' => 'Certificate soft deleted successfully'], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            \Log::error('Certificate not found in destroy method', [
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['message' => 'Certificate not found', 'error' => $e->getMessage()], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error in CertificatesController@destroy', [
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['message' => 'An error occurred while deleting the certificate', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function getCertificateByClientID($client_id)
+    {
+         // Verify if the user is authenticated
+         $user = Auth::user();
+         if (!$user) {
+             return response()->json(['message' => 'Unauthorized'], 401);
+         }
+ 
+         // Check if the user has the required role
+         if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
+             return response()->json(['message' => 'Unauthorized'], 403);
+         }
+         
+
+        try {
+            // Verify if the user is authenticated
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['message' => 'Unauthorized'], 401);
+            }
+
+            // Check if the user has the required role
+            if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            // Retrieve certificates for the given client_id
+            $certificates = Certificate::with('certificateType', 'fireServiceAgent')
+                ->where('client_id', $client_id)
+                ->get();
+
+            if ($certificates->isEmpty()) {
+                return response()->json(['message' => 'No certificates found for the specified client'], 404);
+            }
+
+            // Add isVerified status to each certificate
+            $certificates = $certificates->map(function ($certificate) {
+                $certificate->isVerified = $this->isCertificateVerified($certificate->isVerified);
+                return $certificate;
+            });
+
+            return response()->json(['message' => 'Certificates retrieved successfully', 'data' => $certificates], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error in CertificatesController@getCertificateByClientID', [
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['message' => 'An error occurred while retrieving certificates', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function getCertificateByID($id)
+    {
+         // Verify if the user is authenticated
+         $user = Auth::user();
+         if (!$user) {
+             return response()->json(['message' => 'Unauthorized'], 401);
+         }
+ 
+         // Check if the user has the required role
+         if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
+             return response()->json(['message' => 'Unauthorized'], 403);
+         }
+         
+
+        try {
+            // Verify if the user is authenticated
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['message' => 'Unauthorized'], 401);
+            }
+
+            // Check if the user has the required role
+            if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            // Retrieve the certificate by ID
+            $certificate = Certificate::with('certificateType', 'fireServiceAgent')
+                ->findOrFail($id);
+
+            // Add isVerified status to the certificate
+            $certificate->isVerified = $this->isCertificateVerified($certificate->isVerified);
+
+            return response()->json(['message' => 'Certificate retrieved successfully', 'data' => $certificate], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            \Log::error('Certificate not found in getCertificateByID method', [
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['message' => 'Certificate not found', 'error' => $e->getMessage()], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error in CertificatesController@getCertificateByID', [
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['message' => 'An error occurred while retrieving the certificate', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function getCertificateByCertificateType($certificate_type_id)
+    {
+        try {
+            // Verify if the user is authenticated
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['message' => 'Unauthorized'], 401);
+            }
+
+            // Check if the user has the required role
+            if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            // Retrieve certificates for the given certificate_type_id
+            $certificates = Certificate::with('certificateType', 'fireServiceAgent')
+                ->where('certificate_id', $certificate_type_id)
+                ->get();
+
+            if ($certificates->isEmpty()) {
+                return response()->json(['message' => 'No certificates found for the specified certificate type'], 404);
+            }
+
+            // Add isVerified status to each certificate
+            $certificates = $certificates->map(function ($certificate) {
+                $certificate->isVerified = $this->isCertificateVerified($certificate->isVerified);
+                return $certificate;
+            });
+
+            return response()->json(['message' => 'Certificates retrieved successfully', 'data' => $certificates], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error in CertificatesController@getCertificateByCertificateType', [
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['message' => 'An error occurred while retrieving certificates', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    private function isCertificateVerified($isVerified)
+    {
+        return $isVerified == 1 ? 'verified' : 'not verified';
+    }
+}

@@ -23,6 +23,8 @@ use App\Http\Controllers\CustomerTypeController;
 use App\Http\Controllers\InvoicingController;
 use App\Http\Controllers\EquipmentActivityController;
 use App\Http\Controllers\ServiceProviderDevicesController;
+use App\Http\Controllers\CertificateController;
+use App\Http\Controllers\CertificateTypeController;
 
 
 /*
@@ -149,7 +151,7 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::get('/equipment/status/{id}', [EquipmentController::class, 'checkEquipmentStatus']);
 
   //Protected QR Code Routes
-  Route::post('/qrcode/generate/{serial_number}', [QRCodeController::class, 'generateQrCode'])->name('generate_qr_code');
+  Route::post('/qrcode/generate/{serial_number}', [QRCodeController::class, 'generateEquipmentQrCode'])->name('generate_qr_code');
   Route::put('/qrcode/update/{serial_number}', [QRCodeController::class, 'updateQrCode'])->name('decode_qr_code');
   Route::get('/qrcode/decode/{serial_number}', [QRCodeController::class, 'decodeQrCode'])->name('auth:sanctum');
 
@@ -190,6 +192,23 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::get('/service_provider_device/all', [ServiceProviderDevicesController::class, 'index'])->name('all_service_provider_devices');
   Route::post('/service_provider_device/create', [ServiceProviderDevicesController::class, 'store'])->name('create_service_provider_device');
   Route::put('/service_provider_device/update/{id}', [ServiceProviderDevicesController::class, 'update'])->name('update_service_provider_device');
+
+  //Protected Certificate Types Routes
+  Route::get('/certificate_type/all', [CertificateTypeController::class, 'index'])->name('all_certificate_types');
+  Route::post('/certificate_type/create', [CertificateTypeController::class, 'store'])->name('create_certificate_type');
+  Route::put('/certificate_type/update/{id}', [CertificateTypeController::class, 'update'])->name('update_certificate_type');
+  Route::delete('/certificate_type/{id}', [CertificateTypeController::class, 'destroy'])->name('delete_certificate_type');
+  Route::get('/certificate_type/{id}', [CertificateTypeController::class, 'show'])->name('certificate_type_show');
+
+  //Proteceted Certificate Routes
+  Route::get('/certificate/all', [CertificateController::class, 'index'])->name('all_certificates');
+  Route::post('/certificate/create', [CertificateController::class, 'store'])->name('create_certificate');
+  Route::put('/certificate/update/{id}', [CertificateController::class, 'update'])->name('update_certificate');
+  Route::delete('/certificate/{id}', [CertificateController::class, 'delete'])->name('delete_certificate');
+  Route::get('/certificate/{id}', [CertificateController::class, 'getCertificateByID'])->name('certificate_show');
+  Route::get('/certificate/client/{client_id}', [CertificateController::class, 'getCertificateByClientID'])->name('certificate_by_client');
+  Route::get('/certificates/type/{certificate_type_id}', [CertificateController::class, 'getCertificateByCertificateType']);
+
 });
 
 // Route::middleware('auth:sanctum')->get('/user', function (Request $request) {

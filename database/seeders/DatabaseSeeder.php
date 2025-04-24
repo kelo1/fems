@@ -20,5 +20,6 @@ class DatabaseSeeder extends Seeder
         $this->call(LicenseTypeSeeder::class);
         $this->call(UserTypeSeeder::class);
         $this->call(ServiceProviderDeviceSeeder::class);
+        $this->call(CertificateTypeSeeder::class);
     }
 }

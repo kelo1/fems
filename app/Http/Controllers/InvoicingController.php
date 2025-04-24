@@ -208,42 +208,63 @@ class InvoicingController extends Controller
 
             $items = [];
             $totalAmount = 0;
+            $totalWithholdingTax = 0; // Track total withholding tax
+
             foreach ($InvoiceDecoded as $key => $invoiceitem) {
                 $item_description = Billing::where('id', $invoiceitem['billingitem_' . $key])->value('DESCRIPTION');
                 $vat_applicable_value = Billing::where('id', $invoiceitem['billingitem_' . $key])->value('VAT_APPLICABLE');
+                $with_holding_value = Billing::where('id', $invoiceitem['billingitem_' . $key])->value('WITH_HOLDING_APPLICABLE');
 
                 $vat = $vat_applicable_value == 1
-                    ? ServiceProviderVAT::where('service_provider_id', $service_provider_id)->value('VAT_RATE')
+                    ? Billing::where('created_by', $service_provider_id)->value('VAT_RATE')
                     : 0;
 
-                    $pricePerUnit = $invoiceitem['amount_' . $key];
-                    $quantity = $invoiceitem['quantity_' . $key];
-                
-                    // Calculate the subtotal for the item
-                    $subtotal = $pricePerUnit * $quantity;
-                
-                    // Add VAT if applicable
-                    $vatAmount = $subtotal * ($vat / 100);
-                
-                    // Add the subtotal and VAT to the totalAmount
-                    $totalAmount += $subtotal + $vatAmount;
-                
+                $with_holding_vat = $with_holding_value == 1
+                    ? Billing::where('created_by', $service_provider_id)->value('WITH_HOLDING_RATE')
+                    : 0;
 
-                array_push($items, (new InvoiceItem())
+                $pricePerUnit = $invoiceitem['amount_' . $key];
+                $quantity = $invoiceitem['quantity_' . $key];
+
+                // Calculate the subtotal for the item
+                $subtotal = $pricePerUnit * $quantity;
+
+                // Calculate VAT if applicable
+                $vatAmount = round($subtotal * ($vat / 100), 2);
+
+                // Calculate withholding VAT if applicable
+                $withHoldingAmount = $with_holding_value == 1 ? round($subtotal * ($with_holding_vat / 100), 2) : 0;
+
+                // Add the subtotal and VAT to the totalAmount
+                $totalAmount += $subtotal + $vatAmount;
+
+                // Track the total withholding tax
+                $totalWithholdingTax += $withHoldingAmount;
+
+                // Create the InvoiceItem and add it to the items array
+                $item = (new InvoiceItem())
                     ->title($item_description)
-                    ->pricePerUnit($invoiceitem['amount_' . $key])
-                    ->quantity($invoiceitem['quantity_' . $key])
-                    ->taxByPercent($vat));
+                    ->pricePerUnit($pricePerUnit)
+                    ->quantity($quantity)
+                    ->taxByPercent($vat); // Apply VAT
+                  //  ->discountByPercent($with_holding_vat); // Use discountByPercent for withholding VAT display
+
+                array_push($items, $item);
 
                 \Log::info('Invoice item processed', [
                     'description' => $item_description,
-                    'quantity' => $invoiceitem['quantity_' . $key],
-                    'amount' => $invoiceitem['amount_' . $key],
+                    'quantity' => $quantity,
+                    'amount' => $pricePerUnit,
+                    'subtotal' => $subtotal,
                     'vat' => $vat,
+                    'vat_amount' => $vatAmount,
+                    'withholding_tax' => $withHoldingAmount,
                 ]);
             }
 
-   
+            // Deduct total withholding tax from the total amount
+            $totalAmount -= $totalWithholdingTax;
+
             // Generate the invoice
             $invoice = Invoice::make()
                 ->series('PP')
@@ -261,10 +282,11 @@ class InvoicingController extends Controller
                 ->currencyDecimalPoint('.')
                 ->filename(Str::slug($client_name, '_') . '_' . $serial_number . '_invoice')
                 ->addItems($items)
+                ->notes("Withholding tax (not deducted from payable amount): GH₵" . number_format($totalWithholdingTax, 2))
+                //->logo(public_path('images/logo.png'))
                 ->save('invoices');
 
             \Log::info('Invoice generated', ['filename' => $invoice->filename]);
-
 
             // Save invoice details to the database
             DB::table('invoicings')->insert([
@@ -289,6 +311,8 @@ class InvoicingController extends Controller
                 'url' => Storage::disk('invoices')->url($invoice->filename),
                // 'url' => Storage::url($invoice->filename),  // Use this for s3 storage
                 'filename' => $invoice->filename,
+                'total_withholding_tax' => $totalWithholdingTax,
+    'total_amount' => $totalAmount,
             ], 201);
         } catch (\Exception $e) {
             \Log::error('Exception occurred in generateInvoice', [

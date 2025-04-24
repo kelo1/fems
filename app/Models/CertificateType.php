@@ -4,20 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Billing extends Model
+class CertificateType extends Model
 {
     use HasFactory;
 
-    protected $table = 'billings';
-
     protected $fillable = [
-        'DESCRIPTION',
-        'VAT_APPLICABLE',
-        'isACTIVE',
-        'VAT_RATE',
-        'WITH_HOLDING_APPLICABLE',
-        'WITH_HOLDING_RATE',
+        'certificate_name',
         'created_by',
         'created_by_type',
     ];

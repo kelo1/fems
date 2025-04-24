@@ -52,12 +52,19 @@ class BillingController extends Controller
         $request->validate([
             'DESCRIPTION' => 'nullable|string|max:255',
             'VAT_APPLICABLE' => 'nullable|boolean',
+            'VAT_RATE' => 'required_if:VAT_APPLICABLE,1|nullable|numeric|min:0|max:100',
             'isACTIVE' => 'nullable|boolean',
+            'WITH_HOLDING_APPLICABLE' => 'nullable|boolean',
+            'WITH_HOLDING_RATE' => 'required_if:WITH_HOLDING_APPLICABLE,1|nullable|numeric|min:0|max:100',
+           
         ]);
 
         $billing = Billing::create([
             'DESCRIPTION' => $request->DESCRIPTION,
             'VAT_APPLICABLE' => $request->VAT_APPLICABLE,
+            'VAT_RATE' => $request->VAT_RATE,
+            'WITH_HOLDING_APPLICABLE' => $request->WITH_HOLDING_APPLICABLE,
+            'WITH_HOLDING_RATE' => $request->WITH_HOLDING_RATE,
             'isACTIVE' => $request->isACTIVE,
             'created_by' => $user->id,
             'created_by_type' => get_class($user),
@@ -67,24 +74,24 @@ class BillingController extends Controller
         \Log::info('Billing created', ['billing' => $billing]);
 
         // Check if VAT is applicable
-        if ($request->has('VAT_APPLICABLE') && ($request->VAT_APPLICABLE === true || $request->VAT_APPLICABLE === 1)) {
-            $request->validate([
-                'VAT_RATE' => 'required|numeric|min:0|max:100',
-            ]);
+        // if ($request->has('VAT_APPLICABLE') && ($request->VAT_APPLICABLE === true || $request->VAT_APPLICABLE === 1)) {
+        //     $request->validate([
+        //         'VAT_RATE' => 'required|numeric|min:0|max:100',
+        //     ]);
 
-            // Check if a VAT record already exists for this service provider
-            $existingVAT = ServiceProviderVAT::where('service_provider_id', $user->id)->first();
+        //     // // Check if a VAT record already exists for this service provider
+        //     // $existingVAT = ServiceProviderVAT::where('service_provider_id', $user->id)->first();
 
-            if (!$existingVAT) {
-                // Create a new VAT record
-                ServiceProviderVAT::create([
-                    'service_provider_id' => $user->id,
-                    'VAT_RATE' => $request->VAT_RATE,
-                    'created_by' => $user->id,
-                    'created_by_type' => get_class($user),
-                ]);
-            }
-        }
+        //     // if (!$existingVAT) {
+        //     //     // Create a new VAT record
+        //     //     ServiceProviderVAT::create([
+        //     //         'service_provider_id' => $user->id,
+        //     //         'VAT_RATE' => $request->VAT_RATE,
+        //     //         'created_by' => $user->id,
+        //     //         'created_by_type' => get_class($user),
+        //     //     ]);
+        //     // }
+        // }
 
         return response()->json(['message' => 'Billing created successfully', 'data' => $billing], 201);
     }
@@ -160,7 +167,11 @@ class BillingController extends Controller
         $request->validate([
             'DESCRIPTION' => 'sometimes|string|max:255',
             'VAT_APPLICABLE' => 'sometimes|boolean',
+            'VAT_RATE' => 'sometimes|numeric|min:0|max:100',
+            'WITH_HOLDING_APPLICABLE' => 'sometimes|boolean',
+            'WITH_HOLDING_RATE' => 'sometimes|numeric|min:0|max:100',
             'isACTIVE' => 'sometimes|boolean',
+
         ]);
 
         $billing = Billing::find($id);
@@ -172,24 +183,24 @@ class BillingController extends Controller
         $billing->update($request->all());
 
         // Check if VAT is applicable
-        if ($request->has('VAT_APPLICABLE') && ($request->VAT_APPLICABLE === true || $request->VAT_APPLICABLE === 1)) {
-            $request->validate([
-                'VAT_RATE' => 'required|numeric|min:0|max:100',
-            ]);
+        // if ($request->has('VAT_APPLICABLE') && ($request->VAT_APPLICABLE === true || $request->VAT_APPLICABLE === 1)) {
+        //     $request->validate([
+        //         'VAT_RATE' => 'required|numeric|min:0|max:100',
+        //     ]);
 
-            // Check if a VAT record already exists for this service provider
-            $existingVAT = ServiceProviderVAT::where('service_provider_id', $billing->created_by)->first();
+        //     // Check if a VAT record already exists for this service provider
+        //     $existingVAT = ServiceProviderVAT::where('service_provider_id', $billing->created_by)->first();
 
-            if (!$existingVAT) {
-                // Create a new VAT record
-                ServiceProviderVAT::create([
-                    'service_provider_id' => $billing->created_by,
-                    'VAT_RATE' => $request->VAT_RATE,
-                    'created_by' => $billing->created_by,
-                    'created_by_type' => get_class(Auth::user()),
-                ]);
-            }
-        }
+        //     if (!$existingVAT) {
+        //         // Create a new VAT record
+        //         ServiceProviderVAT::create([
+        //             'service_provider_id' => $billing->created_by,
+        //             'VAT_RATE' => $request->VAT_RATE,
+        //             'created_by' => $billing->created_by,
+        //             'created_by_type' => get_class(Auth::user()),
+        //         ]);
+        //     }
+        // }
 
         // Log the update of the billing
         \Log::info('Billing updated', ['billing' => $billing]);
