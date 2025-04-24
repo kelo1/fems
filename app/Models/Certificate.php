@@ -17,9 +17,20 @@ class Certificate extends Model
         'fsa_id',
         'isVerified',
         'certificate_upload',
+        'serial_number',
         'created_by',
         'created_by_type',
     ];
+
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            $model->serial_number = 'CER-' . strtoupper(uniqid());
+        });
+    }
 
     public function certificateType()
     {

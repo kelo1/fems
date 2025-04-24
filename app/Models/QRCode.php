@@ -14,6 +14,8 @@ class QRCode extends Model
         'qr_code_path',
     ];
 
+    protected $table = 'qrcodes';
+
     public function equipment()
     {
         return $this->belongsTo(Equipment::class, 'serial_number', 'serial_number');

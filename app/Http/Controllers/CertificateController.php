@@ -101,13 +101,10 @@ class CertificateController extends Controller
                 'certificate_upload' => $documentUrl, // Store the file path in the database
             ]);
 
-            // Add the file URL to the response
-            $certificate->certificate_upload_url = $documentUrl;
-
+            
             return response()->json([
                 'message' => 'Certificate created successfully',
                 'data' => $certificate,
-                'certificate_upload_url' => $documentUrl,
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
             // Handle validation errors

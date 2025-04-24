@@ -16,6 +16,7 @@ return new class extends Migration
         Schema::create('certificates', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('certificate_id'); // Foreign key to certificate_types
+            $table->string('serial_number')->unique(); // Unique serial number for the certificate
             $table->unsignedBigInteger('client_id'); // Required
             $table->unsignedBigInteger('fsa_id'); // Foreign key to fire_service_agents
             $table->boolean('isVerified')->default(false); // Indicates if the certificate is verified by FEMS Admin
