@@ -168,7 +168,7 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::get('/billing/service_provider/{serviceProviderId}', [BillingController::class, 'billingByServiceProvider'])->name('billing_by_service_provider');
   Route::post('/billing/create', [BillingController::class, 'store'])->name('setup_billing');
   Route::put('/billing/update/{id}', [BillingController::class, 'update'])->name('update_billing_items');
-  Route::post('/billing/delete', [BillingController::class, 'destroy'])->name('delete_billing_items');
+  Route::delete('/billing/delete', [BillingController::class, 'destroy'])->name('delete_billing_items');
   Route::get('/billing/show/{id}', [BillingController::class, 'show'])->name('show_billitem');
   Route::get('/billing/activebills', [BillingController::class, 'ActiveBillItems'])->name('active_billing');
   Route::get('/billing/search/{search}', [BillingController::class, 'search'])->name('search_billitems');

@@ -247,16 +247,16 @@ class EquipmentController extends Controller
                 'equipmentServiceProviders' => function ($query) {
                     $query->where('status_service_provider', 1); // Only active service providers
                 },
-                'equipmentActivities' => function ($query) use ($id) {
-                    $query->where('equipment_id', $id); // Filter activities by equipment_id
+                'equipmentActivities' => function ($query) use ($service_provider_id) {
+                    $query->where('equipment_id', $service_provider_id); // Filter activities by equipment_id
                 }
-            ])->findOrFail($id);
+            ])->findOrFail($service_provider_id);
 
             // Hide the equipment_clients and equipment_service_providers relationships in the equipment object
             $equipment->makeHidden(['equipmentClients', 'equipmentServiceProviders', 'equipmentActivities']);
 
             // Determine the equipment status
-            $equipmentStatus = $this->determineEquipmentStatus($id);
+            $equipmentStatus = $this->determineEquipmentStatus($service_provider_id);
 
             // Add client names to the clients object
             $clients = $equipment->equipmentClients->map(function ($client) {
