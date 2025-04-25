@@ -226,6 +226,7 @@ class ClientController extends Controller
                 'branch_name' => 'sometimes|string',
                 'company_email' => 'sometimes|email',
                 'company_phone' => 'sometimes|string',
+                'corporate_type_id' => 'sometimes|integer|exists:corporate_types,id',
                 'certificate_of_incorporation' => 'sometimes|file|mimes:pdf,jpg,jpeg,png|max:2048',
                 'gps_address' => 'nullable|string', 
             ];
