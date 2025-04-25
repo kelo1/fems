@@ -630,227 +630,33 @@ class EquipmentController extends Controller
         }
     }
 
-    public function getEquipmentBySerialNumber($serial_number)
-    {
-        try {
-            // Retrieve the equipment record with its associated client and service provider data
-            $equipment = Equipment::with([
-                'equipmentClients' => function ($query) {
-                    $query->where('status_client', 1);
-                },
-                'equipmentServiceProviders' => function ($query) {
-                    $query->where('status_service_provider', 1);
-                },
-                'equipmentActivities' => function ($query) use ($serial_number) {
-                    $query->where('equipment_serial_number', $serial_number); // Filter activities by equipment_serial_number
-                }
-            ])->where('serial_number', $serial_number)->first();
-
-            if (!$equipment) {
-                return response()->json(['message' => 'Equipment not found'], 404);
-            }
-
-            $id = Equipment::where('serial_number', $serial_number)->value('id');
-
-            // Determine the equipment status
-            $equipmentStatus = $this->determineEquipmentStatus($id);
-
-            // Add client names to the clients object
-            $clients = $equipment->equipmentClients->map(function ($client) {
-                $clientDetails = Client::find($client->client_id);
-                if ($clientDetails->client_type === 'INDIVIDUAL') {
-                    $individualClient = Individual_clients::where('client_id', $client->client_id)->first();
-                    $client->name = $individualClient ? $individualClient->first_name . ' ' . $individualClient->last_name : null;
-                } elseif ($clientDetails->client_type === 'CORPORATE') {
-                    $corporateClient = Corporate_clients::where('client_id', $client->client_id)->first();
-                    $client->name = $corporateClient ? $corporateClient->company_name : null;
-                }
-                return $client;
-            });
-
-            // Add service provider names to the service_providers object
-            $serviceProviders = $equipment->equipmentServiceProviders->map(function ($serviceProvider) {
-                $serviceProviderDetails = ServiceProvider::find($serviceProvider->service_provider_id);
-                $serviceProvider->name = $serviceProviderDetails ? $serviceProviderDetails->name : null;
-                return $serviceProvider;
-            });
-
-                 // Add service provider and client names to the activities
-        $activities = $equipment->equipmentActivities->map(function ($activity) {
-            $serviceProvider = ServiceProvider::find($activity->service_provider_id);
-            $client = Client::find($activity->client_id);
-
-            $activity->service_provider_name = $serviceProvider ? $serviceProvider->name : null;
-            $activity->client_name = $client ? ($client->client_type === 'INDIVIDUAL'
-                ? Individual_clients::where('client_id', $client->id)->value('first_name') . ' ' . Individual_clients::where('client_id', $client->id)->value('last_name')
-                : Corporate_clients::where('client_id', $client->id)->value('company_name')) : null;
-
-            return $activity;
-        });
-
-            // Hide the equipment_clients and equipment_service_providers relationships in the equipment object
-            $equipment->makeHidden(['equipmentClients', 'equipmentServiceProviders', 'equipmentActivities']);
-
-            // Format the response as an associative array
-            $response = [
-                'equipment' => $equipment,
-                'clients' => $clients,
-                'service_providers' => $serviceProviders,
-                'equipment_status' => $equipmentStatus,
-                'activities' => $equipment->equipmentActivities,
-            ];
-
-            return response()->json(['message' => 'Equipment retrieved successfully', 'data' => $response], 200);
-        } catch (\Exception $e) {
-            // Log the error
-            \Log::error('Error in getEquipmentBySerialNumber method', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json(['message' => 'An error occurred while retrieving the equipment'], 500);
-        }
-    }
-
-    public function checkEquipmentStatus($id)
-    {
-        try {
-            // Retrieve the equipment record by ID
-            $equipment = Equipment::findOrFail($id);
-
-            // Check if the equipment is expired
-            $expiredEquipment = Equipment::where('id', $id)
-                ->where('expiry_date', '<', Carbon::now())
-                ->exists();
-
-            if ($expiredEquipment) {
-                return response()->json([
-                    'equipment_id' => $id,
-                    'equipment_status' => 'Expired',
-                ], 200);
-            }
-
-            // Check if the equipment is expiring soon
-            $expiringSoonEquipment = Equipment::where('id', $id)
-                ->whereBetween('expiry_date', [Carbon::now(), Carbon::now()->addWeek()])
-                ->exists();
-
-            if ($expiringSoonEquipment) {
-                return response()->json([
-                    'equipment_id' => $id,
-                    'equipment_status' => 'Renewal Due Soon',
-                ], 200);
-            }
-
-            // If neither expired nor expiring soon, return Active
-            return response()->json([
-                'equipment_id' => $id,
-                'equipment_status' => 'Active',
-            ], 200);
-        } catch (\Exception $e) {
-            // Log the error
-            \Log::error('Error in checkEquipmentStatus method', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json(['message' => 'An error occurred while checking equipment status'], 500);
-        }
-    }
-
-    private function determineEquipmentStatus($id)
-    {
-        // Check if the equipment is expired
-        $expiredEquipment = Equipment::where('id', $id)
-            ->where('expiry_date', '<', Carbon::now())
-            ->exists();
-
-        if ($expiredEquipment) {
-            return 'Expired';
-        }
-
-        // Check if the equipment is expiring soon
-        $expiringSoonEquipment = Equipment::where('id', $id)
-            ->whereBetween('expiry_date', [Carbon::now(), Carbon::now()->addWeek()])
-            ->exists();
-
-        if ($expiringSoonEquipment) {
-            return 'Renewal Due Soon';
-        }
-
-        // If neither expired nor expiring soon, return Active
-        return 'Active';
-    }
-
     public function getEquipmentByServiceProvider($service_provider_id)
     {
         try {
-            // Retrieve all equipment for the given service provider with associated records
-            $equipment = Equipment::with([
-                'equipmentClients' => function ($query) {
-                    $query->where('status_client', 1); // Only active clients
-                },
-                'equipmentServiceProviders' => function ($query) use ($service_provider_id) {
-                    $query->where('service_provider_id', $service_provider_id)
-                          ->where('status_service_provider', 1); // Only active service providers
-                },
-                'equipmentActivities' => function ($query) {
-                    $query->orderBy('created_at', 'desc'); // Order activities by creation date
-                }
-            ])->whereHas('equipmentServiceProviders', function ($query) use ($service_provider_id) {
-                $query->where('service_provider_id', $service_provider_id)
-                      ->where('status_service_provider', 1); // Filter by active service providers
-            })->get();
+            // Retrieve all equipment created by the given service provider
+            $equipment = Equipment::where('created_by', $service_provider_id) // Filter by service provider who created the equipment
+              ->get();
 
             if ($equipment->isEmpty()) {
                 return response()->json(['message' => 'No equipment found for the specified service provider'], 404);
             }
 
-            // Add client names to the clients object
-            $clients = $equipment->flatMap(function ($equip) {
-                return $equip->equipmentClients->map(function ($client) {
-                    $clientDetails = Client::find($client->client_id);
-                    if ($clientDetails->client_type === 'INDIVIDUAL') {
-                        $individualClient = Individual_clients::where('client_id', $client->client_id)->first();
-                        $client->name = $individualClient ? $individualClient->first_name . ' ' . $individualClient->last_name : null;
-                    } elseif ($clientDetails->client_type === 'CORPORATE') {
-                        $corporateClient = Corporate_clients::where('client_id', $client->client_id)->first();
-                        $client->name = $corporateClient ? $corporateClient->company_name : null;
-                    }
-                    return $client;
-                });
+            // Add equipment status to each equipment
+            $equipmentWithStatus = $equipment->map(function ($equip) {
+                $id = $equip->id;
+
+                // Determine the equipment status
+                $equipmentStatus = $this->determineEquipmentStatus($id);
+
+                // Add the status to the equipment object
+                $equip->equipment_status = $equipmentStatus;
+
+                return $equip;
             });
 
-            // Add service provider names to the service_providers object
-            $serviceProviders = $equipment->flatMap(function ($equip) {
-                return $equip->equipmentServiceProviders->map(function ($serviceProvider) {
-                    $serviceProviderDetails = ServiceProvider::find($serviceProvider->service_provider_id);
-                    $serviceProvider->name = $serviceProviderDetails ? $serviceProviderDetails->name : null;
-                    return $serviceProvider;
-                });
-            });
-
-            // Add service provider and client names to the activities
-            $activities = $equipment->flatMap(function ($equip) {
-                return $equip->equipmentActivities->map(function ($activity) {
-                    $serviceProvider = ServiceProvider::find($activity->service_provider_id);
-                    $client = Client::find($activity->client_id);
-
-                    $activity->service_provider_name = $serviceProvider ? $serviceProvider->name : null;
-                    $activity->client_name = $client ? ($client->client_type === 'INDIVIDUAL'
-                        ? Individual_clients::where('client_id', $client->id)->value('first_name') . ' ' . Individual_clients::where('client_id', $client->id)->value('last_name')
-                        : Corporate_clients::where('client_id', $client->id)->value('company_name')) : null;
-
-                    return $activity;
-                });
-            });
-
-            // Format the response as an associative array
+            // Format the response
             $response = [
-                'equipment' => $equipment,
-                'clients' => $clients,
-                'service_providers' => $serviceProviders,
-                'activities' => $activities,
+                'equipment' => $equipmentWithStatus,
             ];
 
             return response()->json(['message' => 'Equipment retrieved successfully', 'data' => $response], 200);
@@ -864,4 +670,26 @@ class EquipmentController extends Controller
             return response()->json(['message' => 'An error occurred while retrieving the equipment'], 500);
         }
     }
+
+    private function determineEquipmentStatus($equipment_id)
+{
+    // Retrieve the equipment record
+    $equipment = Equipment::find($equipment_id);
+
+    if (!$equipment) {
+        return 'Unknown'; // Return 'Unknown' if the equipment is not found
+    }
+
+    $expiryDate = Carbon::parse($equipment->expiry_date);
+    $currentDate = Carbon::now();
+
+    // Determine the status based on the expiry date
+    if ($expiryDate->isPast()) {
+        return 'Expired';
+    } elseif ($expiryDate->diffInDays($currentDate) <= 30) {
+        return 'Renewal Due Soon'; // If expiry is within 30 days
+    } else {
+        return 'Active';
+    }
+}
 }
