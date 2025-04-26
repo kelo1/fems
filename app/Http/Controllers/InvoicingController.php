@@ -211,55 +211,68 @@ class InvoicingController extends Controller
             $totalWithholdingTax = 0; // Track total withholding tax
 
             foreach ($InvoiceDecoded as $key => $invoiceitem) {
-                $item_description = Billing::where('id', $invoiceitem['billingitem_' . $key])->value('DESCRIPTION');
-                $vat_applicable_value = Billing::where('id', $invoiceitem['billingitem_' . $key])->value('VAT_APPLICABLE');
-                $with_holding_value = Billing::where('id', $invoiceitem['billingitem_' . $key])->value('WITH_HOLDING_APPLICABLE');
-
-                $vat = $vat_applicable_value == 1
-                    ? Billing::where('created_by', $service_provider_id)->value('VAT_RATE') ?? 0.0
-                    : 0;
-
-                $with_holding_vat = $with_holding_value == 1
-                    ? Billing::where('created_by', $service_provider_id)->value('WITH_HOLDING_RATE') ?? 0.0
-                    : 0;
-
+                $billingItemId = $invoiceitem['billingitem_' . $key];
+            
+                // Fetch the billing item once
+                $billingItem = Billing::find($billingItemId);
+            
+                if (!$billingItem) {
+                    \Log::warning("Billing item not found", ['billing_item_id' => $billingItemId]);
+                    continue;
+                }
+            
+                // Extract necessary data from billing item
+                $itemDescription = $billingItem->DESCRIPTION;
+                $isVatApplicable = $billingItem->VAT_APPLICABLE == 1;
+                $isWithholdingApplicable = $billingItem->WITH_HOLDING_APPLICABLE == 1;
+            
+                // Use rates only if applicable, otherwise default to 0.0
+                $vatRate = $isVatApplicable ? ($billingItem->VAT_RATE ?? 0.0) : 0.0;
+                $withholdingRate = $isWithholdingApplicable ? ($billingItem->WITH_HOLDING_RATE ?? 0.0) : 0.0;
+            
+                // Log the extracted values
+                \Log::info('Billing values retrieved', [
+                    'description' => $itemDescription,
+                    'vat_applicable' => $isVatApplicable,
+                    'withholding_applicable' => $isWithholdingApplicable,
+                    'vat_rate' => $vatRate,
+                    'withholding_rate' => $withholdingRate,
+                    'service_provider_id' => $service_provider_id,
+                ]);
+            
+                // Prices and quantities from decoded invoice input
                 $pricePerUnit = $invoiceitem['amount_' . $key];
                 $quantity = $invoiceitem['quantity_' . $key];
-
-                // Calculate the subtotal for the item
+            
+                // Calculate subtotal and taxes
                 $subtotal = $pricePerUnit * $quantity;
-
-                // Calculate VAT if applicable
-                $vatAmount = round($subtotal * ($vat / 100), 2);
-
-                // Calculate withholding VAT if applicable
-                $withHoldingAmount = $with_holding_value == 1 ? round($subtotal * ($with_holding_vat / 100), 2) : 0;
-
-                // Add the subtotal and VAT to the totalAmount
+                $vatAmount = round($subtotal * ($vatRate / 100), 2);
+                $withholdingAmount = round($subtotal * ($withholdingRate / 100), 2);
+            
+                // Update totals
                 $totalAmount += $subtotal + $vatAmount;
-
-                // Track the total withholding tax
-                $totalWithholdingTax += $withHoldingAmount;
-
-                // Create the InvoiceItem and add it to the items array
+                $totalWithholdingTax += $withholdingAmount;
+            
+                // Create and push the invoice item
                 $item = (new InvoiceItem())
-                    ->title($item_description)
+                    ->title($itemDescription)
                     ->pricePerUnit($pricePerUnit)
                     ->quantity($quantity)
-                    ->taxByPercent($vat); // Apply VAT
-
-                array_push($items, $item);
-
+                    ->taxByPercent($vatRate); // Laravel Daily Invoice tax field
+            
+                $items[] = $item;
+            
+                // Log processed invoice item
                 \Log::info('Invoice item processed', [
-                    'description' => $item_description,
+                    'description' => $itemDescription,
                     'quantity' => $quantity,
                     'amount' => $pricePerUnit,
                     'subtotal' => $subtotal,
-                    'vat' => $vat,
                     'vat_amount' => $vatAmount,
-                    'withholding_tax' => $withHoldingAmount,
+                    'withholding_tax' => $withholdingAmount,
                 ]);
             }
+            
 
             // Deduct total withholding tax from the total amount
             $totalAmount -= $totalWithholdingTax;
