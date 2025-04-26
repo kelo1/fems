@@ -216,11 +216,11 @@ class InvoicingController extends Controller
                 $with_holding_value = Billing::where('id', $invoiceitem['billingitem_' . $key])->value('WITH_HOLDING_APPLICABLE');
 
                 $vat = $vat_applicable_value == 1
-                    ? Billing::where('created_by', $service_provider_id)->value('VAT_RATE')
+                    ? Billing::where('created_by', $service_provider_id)->value('VAT_RATE') ?? 0.0
                     : 0;
 
                 $with_holding_vat = $with_holding_value == 1
-                    ? Billing::where('created_by', $service_provider_id)->value('WITH_HOLDING_RATE')
+                    ? Billing::where('created_by', $service_provider_id)->value('WITH_HOLDING_RATE') ?? 0.0
                     : 0;
 
                 $pricePerUnit = $invoiceitem['amount_' . $key];
@@ -247,7 +247,6 @@ class InvoicingController extends Controller
                     ->pricePerUnit($pricePerUnit)
                     ->quantity($quantity)
                     ->taxByPercent($vat); // Apply VAT
-                  //  ->discountByPercent($with_holding_vat); // Use discountByPercent for withholding VAT display
 
                 array_push($items, $item);
 
@@ -283,7 +282,7 @@ class InvoicingController extends Controller
                 ->filename(Str::slug($client_name, '_') . '_' . $serial_number . '_invoice')
                 ->addItems($items)
                 ->notes("Withholding tax (not deducted from payable amount): GH₵" . number_format($totalWithholdingTax, 2))
-                //->logo(public_path('images/logo.png'))
+                ->logo(public_path('storage/fems/logo.jpg'))
                 ->save('invoices');
 
             \Log::info('Invoice generated', ['filename' => $invoice->filename]);

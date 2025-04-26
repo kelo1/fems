@@ -14,9 +14,9 @@ return new class extends Migration
     public function up()
     {
         Schema::table('billings', function (Blueprint $table) {
-            $table->decimal('VAT_RATE', 5, 2)->nullable()->after('VAT_APPLICABLE'); // VAT rate as a percentage
+            $table->integer('VAT_RATE')->nullable()->after('VAT_APPLICABLE'); // VAT rate as a percentage
             $table->tinyInteger('WITH_HOLDING_APPLICABLE')->default(0)->after('VAT_RATE'); // 1 if applicable, 0 otherwise
-            $table->decimal('WITH_HOLDING_RATE', 5, 2)->nullable()->after('WITH_HOLDING_APPLICABLE'); // Withholding rate as a percentage
+            $table->integer('WITH_HOLDING_RATE')->nullable()->after('WITH_HOLDING_APPLICABLE'); // Withholding rate as a percentage
         });
     }
 
