@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\EquipmentActivity;
 use App\Models\Equipment;
+use App\Models\Client;
 use App\Models\ServiceProviderDevice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -57,7 +58,7 @@ class EquipmentActivityController extends Controller
             $activity = EquipmentActivity::create([
                 'activity' => $request->activity,
                 'next_maintenance_date' => $request->next_maintenance_date,
-                'service_provider_id' => $request->service_provider_id,
+                'service_provider_id' => $user->id,
                 'device_serial_number' => $request->device_serial_number,
                 'client_id' => $request->client_id,
                 'equipment_id' => $request->equipment_id,
@@ -72,6 +73,46 @@ class EquipmentActivityController extends Controller
                     'expiry_date' => $request->next_maintenance_date,
                 ]);
             }
+
+           
+
+            $client = Client::findOrFail($request->client_id);
+
+            // Insert the old record into the client_history table
+            \DB::table('client_history')->insert([
+                'client_id' => $request->client_id,
+                'old_service_provider_id' => $client->created_by,
+                'new_service_provider_id' =>  $user->id,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]);
+
+            // Update the client record
+            $client->created_by = $user->id;
+            $client->save();
+
+
+
+            // Deactivate the current service provider record
+            $deactivated = \DB::table('equipment_service_providers')
+            ->where('equipment_id', $request->equipment_id)
+            ->where('status_service_provider', 1)
+            ->update(['status_service_provider' => 0]);
+
+            if ($deactivated === 0) {
+                \Log::warning("No active service provider found for equipment ID {$equipment_id}");
+            }
+
+            // Insert a new record with the updated service_provider_id
+            \DB::table('equipment_service_providers')->insert([
+                'equipment_id' => $request->equipment_id,
+                'serial_number' => $equipment->serial_number,
+                'service_provider_id' =>  $user->id,
+                'status_service_provider' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
 
             \DB::commit();
 

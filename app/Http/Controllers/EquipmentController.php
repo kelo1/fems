@@ -719,4 +719,46 @@ public function getEquipmentHistory($equipment_id)
         return response()->json(['message' => 'An error occurred while retrieving the equipment history'], 500);
     }
 }
+public function getEquipmentBySerialNumber($serial_number)
+{
+    try {
+        // Retrieve the equipment record by serial number
+        $equipment = Equipment::where('serial_number', $serial_number)->first();
+
+        if (!$equipment) {
+            return response()->json(['message' => 'Equipment not found'], 404);
+        }
+
+        // Determine the equipment status
+        $equipmentStatus = $this->determineEquipmentStatus($equipment->id);
+
+        // Retrieve the client details based on client_type
+        $client = Client::find($equipment->client_id);
+        $clientName = null;
+
+        if ($client) {
+            if ($client->client_type === 'INDIVIDUAL') {
+                $individualClient = Individual_clients::where('client_id', $client->id)->first();
+                $clientName = $individualClient ? $individualClient->first_name . ' ' . $individualClient->last_name : null;
+            } elseif ($client->client_type === 'CORPORATE') {
+                $corporateClient = Corporate_clients::where('client_id', $client->id)->first();
+                $clientName = $corporateClient ? $corporateClient->company_name : null;
+            }
+        }
+
+        // Add status and client_name to the equipment object
+        $equipment->equipment_status = $equipmentStatus;
+        $equipment->client_name = $clientName;
+
+        return response()->json(['message' => 'Equipment retrieved successfully', 'data' => $equipment], 200);
+    } catch (\Exception $e) {
+        // Log the error
+        \Log::error('Error in getEquipmentBySerialNumber method', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+
+        return response()->json(['message' => 'An error occurred while retrieving the equipment'], 500);
+    }
+}
 }
