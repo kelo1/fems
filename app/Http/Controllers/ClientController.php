@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\Corporate_clients;
 use App\Models\Individual_clients;
 use App\Models\CorporateType;
+use App\Models\ClientHistory;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Hash;
@@ -1002,4 +1003,51 @@ class ClientController extends Controller
     }
     }
 
+    public function getClientHistory($client_id)
+    {
+        try {
+            // Retrieve client history for the given client_id
+            $clientHistories = ClientHistory::with(['client', 'oldServiceProvider', 'newServiceProvider'])
+                ->where('client_id', $client_id)
+                ->get()
+                ->map(function ($history) {
+                    $client = $history->client;
+
+                    // Determine if the client is individual or corporate
+                    if ($client->client_type === 'INDIVIDUAL') {
+                        $clientDetails = Individual_clients::where('client_id', $client->id)->first();
+                    } elseif ($client->client_type === 'CORPORATE') {
+                        $clientDetails = Corporate_clients::where('client_id', $client->id)->first();
+                    } else {
+                        $clientDetails = null;
+                    }
+
+                    return [
+                        'client' => [
+                            'id' => $client->id,
+                            'type' => $client->client_type,
+                            'details' => $clientDetails,
+                        ],
+                        'old_service_provider' => $history->oldServiceProvider,
+                        'new_service_provider' => $history->newServiceProvider,
+                    ];
+                });
+
+            if ($clientHistories->isEmpty()) {
+                return response()->json(['message' => 'No history found for the specified client'], 404);
+            }
+
+            return response()->json([
+                'message' => 'Client history retrieved successfully',
+                'data' => $clientHistories,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error in getClientHistory method', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json(['message' => 'An error occurred while retrieving the client history'], 500);
+        }
+    }
 }

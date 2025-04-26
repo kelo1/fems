@@ -53,18 +53,18 @@ class Equipment extends Model
     // Relationship with EquipmentClient
     public function equipmentClients()
     {
-        return $this->hasMany(EquipmentClient::class);
+        return $this->hasMany(EquipmentClient::class, 'equipment_id');
     }
 
     // Relationship with EquipmentServiceProvider
     public function equipmentServiceProviders()
     {
-        return $this->hasMany(EquipmentServiceProvider::class);
+        return $this->hasMany(EquipmentServiceProvider::class, 'equipment_id');
     }
 
     // Relationship with EquipmentActivity
     public function equipmentActivities()
     {
-        return $this->hasMany(EquipmentActivity::class);
+        return $this->hasMany(EquipmentActivity::class, 'equipment_id');
     }
 }

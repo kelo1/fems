@@ -36,10 +36,21 @@ class CorporateClientsController extends Controller
 
       // Get all corporate clients
     public function getCorporateClients()
-    {
+    {   
+        // Check if the user is authenticated
+        $user = Auth::user();
+        if (!$user) {
+            return response(['message' => 'Unauthorized'], 403);
+        }
+
         try {
             // Retrieve all corporate clients with their associated client and corporate type details
-            $corporateClients = Corporate_clients::with('client', 'corporateType')->get();
+            $corporateClients = Corporate_clients::with('client', 'corporateType')
+            ->whereHas('client', function ($query) use ($user) {
+                $query->where('created_by', $user->id) // Filter by created_by in the clients table
+                      ->where('created_by_type', get_class($user)); 
+            })
+            ->get();
 
             // Get the base URL from the environment variable
             $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set

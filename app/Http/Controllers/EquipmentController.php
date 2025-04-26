@@ -237,71 +237,39 @@ class EquipmentController extends Controller
     public function getEquipmentByClient($client_id)
     {
         try {
-            // Retrieve equipment for the given client with associated records
-            $equipment = Equipment::with([
-                'equipmentClients' => function ($query) {
-                    $query->where('status_client', 1); // Only active clients
-                }, 
-                'equipmentServiceProviders' => function ($query) {
-                    $query->where('status_service_provider', 1); // Only active service providers
-                },
-                'equipmentActivities' => function ($query) use ($id) {
-                    $query->where('equipment_id', $id); // Filter activities by equipment_id
-                }
-            ])->findOrFail($id);
+            // Retrieve equipment for the given client with status_client = 1
+            $equipment = Equipment::join('equipment_clients', 'equipment.id', '=', 'equipment_clients.equipment_id')
+                ->where('equipment_clients.client_id', $client_id)
+                ->where('equipment_clients.status_client', 1)
+                ->select('equipment.*') // Select all columns from the equipment table
+                ->get();
 
-            // Hide the equipment_clients and equipment_service_providers relationships in the equipment object
-            $equipment->makeHidden(['equipmentClients', 'equipmentServiceProviders', 'equipmentActivities']);
+            if ($equipment->isEmpty()) {
+                return response()->json(['message' => 'No equipment found for the specified client'], 404);
+            }
 
-            // Determine the equipment status
-            $equipmentStatus = $this->determineEquipmentStatus($id);
+            // Add equipment status to each equipment
+            $equipmentWithStatus = $equipment->map(function ($equip) {
+                $id = $equip->id;
 
-            // Add client names to the clients object
-            $clients = $equipment->equipmentClients->map(function ($client) {
-                $clientDetails = Client::find($client->client_id);
-                if ($clientDetails->client_type === 'INDIVIDUAL') {
-                    $individualClient = Individual_clients::where('client_id', $client->client_id)->first();
-                    $client->name = $individualClient ? $individualClient->first_name . ' ' . $individualClient->last_name : null;
-                } elseif ($clientDetails->client_type === 'CORPORATE') {
-                    $corporateClient = Corporate_clients::where('client_id', $client->client_id)->first();
-                    $client->name = $corporateClient ? $corporateClient->company_name : null;
-                }
-                return $client;
+                // Determine the equipment status
+                $equipmentStatus = $this->determineEquipmentStatus($id);
+
+                // Add the status to the equipment object
+                $equip->equipment_status = $equipmentStatus;
+
+                return $equip;
             });
 
-            // Add service provider names to the service_providers object
-            $serviceProviders = $equipment->equipmentServiceProviders->map(function ($serviceProvider) {
-                $serviceProviderDetails = ServiceProvider::find($serviceProvider->service_provider_id);
-                $serviceProvider->name = $serviceProviderDetails ? $serviceProviderDetails->name : null;
-                return $serviceProvider;
-            });
-
-            // Add service provider and client names to the activities
-        $activities = $equipment->equipmentActivities->map(function ($activity) {
-            $serviceProvider = ServiceProvider::find($activity->service_provider_id);
-            $client = Client::find($activity->client_id);
-
-            $activity->service_provider_name = $serviceProvider ? $serviceProvider->name : null;
-            $activity->client_name = $client ? ($client->client_type === 'INDIVIDUAL'
-                ? Individual_clients::where('client_id', $client->id)->value('first_name') . ' ' . Individual_clients::where('client_id', $client->id)->value('last_name')
-                : Corporate_clients::where('client_id', $client->id)->value('company_name')) : null;
-
-            return $activity;
-        });
-
-            // Format the response as an associative array
+            // Format the response
             $response = [
-                'equipment' => $equipment,
-                'clients' => $clients,
-                'service_providers' => $serviceProviders,
-                'equipment_status' => $equipmentStatus,
-                'activities' => $equipment->equipmentActivities,
+                'equipment' => $equipmentWithStatus,
             ];
 
             return response()->json(['message' => 'Equipment retrieved successfully', 'data' => $response], 200);
         } catch (\Exception $e) {
             // Log the error
-            \Log::error('Error in getEquipmentByID method', [
+            \Log::error('Error in getEquipmentByClient method', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -377,7 +345,6 @@ class EquipmentController extends Controller
 
         try {
             \DB::beginTransaction();
-            \DB::enableQueryLog();
 
             // Retrieve the equipment record
             $equipment = Equipment::findOrFail($equipment_id);
@@ -389,42 +356,35 @@ class EquipmentController extends Controller
 
             \Log::info('Equipment fetched:', ['equipment' => $equipment]);
 
-            // Handle client_id if provided
-            if ($request->has('client_id')) {
-                // Update the client_id in the equipment record if null
-                if ($equipment->client_id === null) {
-                    $equipment->client_id = $request->client_id;
-                    $equipment->save();
-                }
-
-                // Deactivate the current client record
-                $deactivated = \DB::table('equipment_clients')
-                    ->where('equipment_id', $equipment_id)
-                    ->where('status_client', 1)
-                    ->update(['status_client' => 0]);
-
-                if ($deactivated === 0) {
-                    \Log::warning("No active client found for equipment ID {$equipment_id}");
-                }
-
-                // Insert a new record with the updated client_id
-                \DB::table('equipment_clients')->insert([
-                    'equipment_id' => $equipment->id,
-                    'serial_number' => $equipment->serial_number,
-                    'client_id' => $request->client_id,
-                    'status_client' => 1,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
-                \Log::info('Client updated successfully', [
-                    'equipment_id' => $equipment_id,
-                    'client_id' => $request->client_id,
-                ]);
-            }
-
             // Handle service_provider_id if provided
             if ($request->has('service_provider_id')) {
+                // Check if the equipment has been assigned to a client
+                if ($equipment->client_id == null) {
+                    return response()->json(['message' => 'No client has been assigned to the equipment'], 400);
+                }
+
+                // Update the client record by setting created_by to the new service_provider_id
+                $client = Client::find($equipment->client_id);
+                if ($client) {
+                    // Insert the old record into the client_history table
+                    \DB::table('client_history')->insert([
+                        'client_id' => $client->id,
+                        'old_service_provider_id' => $client->created_by,
+                        'new_service_provider_id' => $request->service_provider_id,
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ]);
+
+                    // Update the client record
+                    $client->created_by = $request->service_provider_id;
+                    $client->save();
+
+                    \Log::info('Client record updated successfully', [
+                        'client_id' => $client->id,
+                        'new_service_provider_id' => $request->service_provider_id,
+                    ]);
+                }
+
                 // Deactivate the current service provider record
                 $deactivated = \DB::table('equipment_service_providers')
                     ->where('equipment_id', $equipment_id)
@@ -451,8 +411,39 @@ class EquipmentController extends Controller
                 ]);
             }
 
+            // Handle client_id if provided
+            if ($request->has('client_id')) {
+                // Deactivate the current client record
+                $deactivated = \DB::table('equipment_clients')
+                    ->where('equipment_id', $equipment_id)
+                    ->where('status_client', 1)
+                    ->update(['status_client' => 0]);
+
+                if ($deactivated === 0) {
+                    \Log::warning("No active client found for equipment ID {$equipment_id}");
+                }
+
+                // Assign the client to the equipment
+                $equipment->client_id = $request->client_id;
+                $equipment->save();
+
+                // Insert a new record with the updated client_id
+                \DB::table('equipment_clients')->insert([
+                    'equipment_id' => $equipment->id,
+                    'serial_number' => $equipment->serial_number,
+                    'client_id' => $request->client_id,
+                    'status_client' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                \Log::info('Client updated successfully', [
+                    'equipment_id' => $equipment_id,
+                    'client_id' => $request->client_id,
+                ]);
+            }
+
             \DB::commit();
-            \Log::info('Update query log:', \DB::getQueryLog());
 
             return response()->json([
                 'message' => 'Update successful',
@@ -462,7 +453,7 @@ class EquipmentController extends Controller
             ]);
         } catch (\Exception $e) {
             \DB::rollBack();
-            \Log::error('Error in updateClient method:', [
+            \Log::error('Error in updateClientOrServiceProvider method:', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -690,6 +681,42 @@ class EquipmentController extends Controller
         return 'Renewal Due Soon'; // If expiry is within 30 days
     } else {
         return 'Active';
+    }
+}
+
+public function getEquipmentHistory($equipment_id)
+{
+    try {
+        // Retrieve equipment history by joining related tables
+        $equipmentHistory = Equipment::where('id', $equipment_id)
+            ->with([
+                'equipmentActivities' => function ($query) {
+                    $query->orderBy('created_at', 'desc'); // Order activities by creation date
+                },
+                'equipmentServiceProviders' => function ($query) {
+                    $query->where('status_service_provider', 1); // Only active service providers
+                },
+                'equipmentClients' => function ($query) {
+                    $query->where('status_client', 1); // Only active clients
+                }
+            ])
+            ->first();
+
+        if (!$equipmentHistory) {
+            return response()->json(['message' => 'No history found for the specified equipment'], 404);
+        }
+
+        return response()->json([
+            'message' => 'Equipment history retrieved successfully',
+            'data' => $equipmentHistory,
+        ], 200);
+    } catch (\Exception $e) {
+        \Log::error('Error in getEquipmentHistory method', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+
+        return response()->json(['message' => 'An error occurred while retrieving the equipment history'], 500);
     }
 }
 }

@@ -103,6 +103,7 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::get('/client/uploads/{id}', [ClientController::class, 'getClientUploads'])->name('client_uploads');
   Route::delete('/client/delete_upload/{id}', [ClientController::class, 'deleteClientUpload'])->name('delete_client_upload');
   Route::post('/client/uploads/update', [ClientController::class, 'updateClientUploads'])->name('update_client_uploads');
+  Route::get('/client/history/{client_id}', [ClientController::class, 'getClientHistory']);
 
   //Protected Corporate Client Routes
   Route::get('/client/corporate_clients', [CorporateClientsController::class, 'getCorporateClients'])->name('all_corporate_clients');
@@ -149,6 +150,7 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::get('/equipment/details/{id}', [EquipmentController::class, 'getEquipmentByID'])->name('equipment_details');
   Route::get('/equipment/serial_number/{serial_number}', [EquipmentController::class, 'getEquipmentBySerialNumber'])->name('equipment_by_serial_number');
   Route::get('/equipment/status/{id}', [EquipmentController::class, 'checkEquipmentStatus']);
+  Route::get('/equipment/history/{equipment_id}', [EquipmentController::class, 'getEquipmentHistory'])->name('equipment_history');
 
   //Protected QR Code Routes
   Route::post('/qrcode/equipment/{serial_number}', [QRCodeController::class, 'generateEquipmentQrCode'])->name('generate_qr_code');

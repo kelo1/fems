@@ -37,10 +37,19 @@ class IndividualClientsController extends Controller
 
     public function getIndividualClients()
     {
+        $user = Auth::user();
+        if (!$user) {
+            return response(['message' => 'Unauthorized'], 403);
+        }
+
         try {
             // Retrieve all individual clients with their associated client details
-            $individualClients = Individual_clients::with('client')->get();
-
+            $individualClients = Individual_clients::with('client')
+            ->whereHas('client', function ($query) use ($user) {
+                $query->where('created_by', $user->id)
+                      ->where('created_by_type', get_class($user)); // Filter by created_by in the clients table
+            })
+            ->get();
             // Get the base URL from the environment variable
             $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
 
