@@ -16,7 +16,6 @@ class Invoicing extends Model
         'invoice_number',
         'equipment_serial_number',
         'client_id',
-        'invoice_type',
         'invoice_details',
         'invoice',
         'payment_amount',

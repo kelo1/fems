@@ -186,7 +186,6 @@ class InvoicingController extends Controller
                 'custom_fields' => [
                     'email' => $service_provider->email,
                     'address' => $service_provider->address,
-                    'Invoice type' => $request->invoice_type,
                 ],
             ]);
             \Log::info('Seller party created', ['seller' => $seller]);
@@ -306,7 +305,6 @@ class InvoicingController extends Controller
                 'invoice_number' => $invoice->getSerialNumber(),
                 'equipment_serial_number' => $serial_number,
                 'client_id' => $client_id,
-                'invoice_type' => $request->invoice_type,
                 'invoice_details' => json_encode($Invoice_items), // Save as JSON string
                 'invoice' => $invoice->filename,
                 'payment_amount' => $totalAmount,
@@ -387,14 +385,12 @@ class InvoicingController extends Controller
 
             // Validate the request data
             $request->validate([
-                'invoice_type' => 'sometimes|string',
                 'invoice_details' => 'sometimes|array',
                 'payment_status' => 'sometimes|integer|in:0,1', // 0 = unpaid, 1 = paid
             ]);
 
             // Update the invoice
             $invoice->update([
-                'invoice_type' => $request->invoice_type ?? $invoice->invoice_type,
                 'invoice_details' => $request->invoice_details ? json_encode($request->invoice_details) : $invoice->invoice_details,
                 'payment_status' => $request->payment_status ?? $invoice->payment_status,
                 'updated_at' => Carbon::now(),

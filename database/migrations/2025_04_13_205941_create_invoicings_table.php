@@ -19,7 +19,6 @@ return new class extends Migration
             $table->string('invoice_number')->unique();
             $table->string('equipment_serial_number')->nullable();
             $table->unsignedBigInteger('client_id')->nullable();
-            $table->string('invoice_type'); // e.g., service, equipment
             $table->text('invoice_details')->nullable(); // description of the invoice
             $table->string('invoice')->nullable();
             $table->double('payment_amount', 15, 2); // total amount of the invoice
