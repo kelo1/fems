@@ -337,25 +337,20 @@ class InvoicingController extends Controller
 {
     try {
         // Retrieve the invoice by ID
-        $invoice = Invoicing::with('client')->find($id);
+        $invoice = Invoicing::find($id);
 
         if (!$invoice) {
             return response()->json(['message' => 'Invoice not found'], 404);
         }
 
-        // Retrieve client details dynamically based on client_type
-        $client = Client::find($invoice->client_id);
-        $clientDetails = null;
+        $baseURL = env('APP_BASE_URL', config('app.url'));
 
-        if ($client) {
-            if ($client->client_type === 'CORPORATE') {
-                $clientDetails = Corporate_clients::where('client_id', $client->id)->first();
-            } else {
-                $clientDetails = Individual_clients::where('client_id', $client->id)->first();
-            }
-        }
+        $invoice->url = $baseURL . Storage::url('invoices/' . $invoice->invoice);
 
-        return response()->json(['message' => 'Invoice retrieved successfully', 'data' => $invoice], 200);
+        return response()->json(['message' => 'Invoice retrieved successfully', 
+        "invoice_number" => $invoice->invoice_number,
+        "equipment_serial_number" => $invoice->equipment_serial_number,
+        "invoice_url"=>$invoice->url], 200);
     } catch (\Exception $e) {
         // Log the error
         \Log::error('Error in show method for invoices', [
