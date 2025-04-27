@@ -333,7 +333,39 @@ class InvoicingController extends Controller
         }
     }
 
-   
+    public function show($id)
+{
+    try {
+        // Retrieve the invoice by ID
+        $invoice = Invoicing::with('client')->find($id);
+
+        if (!$invoice) {
+            return response()->json(['message' => 'Invoice not found'], 404);
+        }
+
+        // Retrieve client details dynamically based on client_type
+        $client = Client::find($invoice->client_id);
+        $clientDetails = null;
+
+        if ($client) {
+            if ($client->client_type === 'CORPORATE') {
+                $clientDetails = Corporate_clients::where('client_id', $client->id)->first();
+            } else {
+                $clientDetails = Individual_clients::where('client_id', $client->id)->first();
+            }
+        }
+
+        return response()->json(['message' => 'Invoice retrieved successfully', 'data' => $invoice], 200);
+    } catch (\Exception $e) {
+        // Log the error
+        \Log::error('Error in show method for invoices', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+
+        return response()->json(['message' => 'An error occurred while retrieving the invoice'], 500);
+    }
+}
 
     /**
      * Show the form for editing the specified resource.
