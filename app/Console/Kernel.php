@@ -15,7 +15,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // $schedule->command('inspire')->hourly();
+       // Schedule the certificate expiry notification command to run daily
+        $schedule->command('notify:certificate-expiry')->daily();
     }
 
     /**

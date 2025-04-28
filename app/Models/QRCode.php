@@ -18,6 +18,6 @@ class QRCode extends Model
 
     public function equipment()
     {
-        return $this->belongsTo(Equipment::class, 'serial_number', 'serial_number');
+        return $this->belongsTo(Equipment::class, 'serial_number');
     }
 }
