@@ -18,6 +18,9 @@ class Certificate extends Model
         'isVerified',
         'certificate_upload',
         'serial_number',
+        'issued_date',
+        'expiry_date',
+        'status',
         'created_by',
         'created_by_type',
     ];

@@ -51,6 +51,8 @@ class CertificateController extends Controller
                 'certificate_id' => 'required|exists:certificate_types,id', // Certificate type must exist
                 'client_id' => 'required|exists:clients,id', // Client must exist
                 'fsa_id' => 'required|exists:fire_service_agents,id', // FSA is required
+                'issued_date' => 'required|date', // Issued date is required
+                'expiry_date' => 'required|date|after:issued_date', // Expiry date must be after issued date
                 'certificate_upload' => 'required|file|mimes:pdf,jpg,jpeg,png|max:2048', // File upload validation
             ]);
 
@@ -96,6 +98,8 @@ class CertificateController extends Controller
                 'certificate_id' => $request->certificate_id,
                 'client_id' => $request->client_id,
                 'fsa_id' => $request->fsa_id,
+                'issued_date' => $request->issued_date,
+                'expiry_date' => $request->expiry_date,
                 'created_by' => $user->id,
                 'created_by_type' => get_class($user),
                 'certificate_upload' => $documentUrl, // Store the file path in the database
@@ -156,6 +160,8 @@ class CertificateController extends Controller
                 'certificate_id' => 'sometimes|exists:certificate_types,id',
                 'client_id' => 'sometimes|exists:clients,id',
                 'fsa_id' => 'nullable|exists:fire_service_agents,id',
+                'issued_date' => 'sometimes|date',
+                'expiry_date' => 'sometimes|date|after:issued_date',
                 'created_by' => 'sometimes|integer',
                 'created_by_type' => 'sometimes|string',
                 'certificate_upload' => 'sometimes|file|mimes:pdf,jpg,jpeg,png|max:2048', // File upload validation
@@ -196,6 +202,8 @@ class CertificateController extends Controller
                 'certificate_id' => $request->certificate_id ?? $certificate->certificate_id,
                 'client_id' => $request->client_id ?? $certificate->client_id,
                 'fsa_id' => $request->fsa_id ?? $certificate->fsa_id,
+                'issued_date' => $request->issued_date ?? $certificate->issued_date,
+                'expiry_date' => $request->expiry_date ?? $certificate->expiry_date,
                 'created_by' => $user->id,
                 'created_by_type' => get_class($user),
             ]);
@@ -250,30 +258,18 @@ class CertificateController extends Controller
 
     public function getCertificateByClientID($client_id)
     {
-         // Verify if the user is authenticated
-         $user = Auth::user();
-         if (!$user) {
-             return response()->json(['message' => 'Unauthorized'], 401);
-         }
- 
-         // Check if the user has the required role
-         if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
-             return response()->json(['message' => 'Unauthorized'], 403);
-         }
-         
+        // Verify if the user is authenticated
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        // Check if the user has the required role
+        if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
 
         try {
-            // Verify if the user is authenticated
-            $user = Auth::user();
-            if (!$user) {
-                return response()->json(['message' => 'Unauthorized'], 401);
-            }
-
-            // Check if the user has the required role
-            if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
-                return response()->json(['message' => 'Unauthorized'], 403);
-            }
-
             // Retrieve certificates for the given client_id
             $certificates = Certificate::with('certificateType', 'fireServiceAgent', 'client')
                 ->where('client_id', $client_id)
@@ -283,8 +279,12 @@ class CertificateController extends Controller
                 return response()->json(['message' => 'No certificates found for the specified client'], 404);
             }
 
-            // Add isVerified status to each certificate
+            // Check if each certificate has expired and update the status if necessary
             $certificates = $certificates->map(function ($certificate) {
+                if (now()->greaterThan($certificate->expiry_date)) {
+                    $certificate->status = 'expired';
+                    $certificate->save(); // Update the status in the database
+                }
                 $certificate->isVerified = $this->isCertificateVerified($certificate->isVerified);
                 return $certificate;
             });
@@ -300,35 +300,28 @@ class CertificateController extends Controller
 
     public function getCertificateByID($id)
     {
-         // Verify if the user is authenticated
-         $user = Auth::user();
-         if (!$user) {
-             return response()->json(['message' => 'Unauthorized'], 401);
-         }
- 
-         // Check if the user has the required role
-         if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
-             return response()->json(['message' => 'Unauthorized'], 403);
-         }
-         
+        // Verify if the user is authenticated
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        // Check if the user has the required role
+        if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
 
         try {
-            // Verify if the user is authenticated
-            $user = Auth::user();
-            if (!$user) {
-                return response()->json(['message' => 'Unauthorized'], 401);
-            }
-
-            // Check if the user has the required role
-            if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
-                return response()->json(['message' => 'Unauthorized'], 403);
-            }
-
             // Retrieve the certificate by ID
             $certificate = Certificate::with('certificateType', 'fireServiceAgent', 'client')
                 ->findOrFail($id);
 
-            // Add isVerified status to the certificate
+            // Check if the certificate has expired and update the status if necessary
+            if (now()->greaterThan($certificate->expiry_date)) {
+                $certificate->status = 'expired';
+                $certificate->save(); // Update the status in the database
+            }
+
             $certificate->isVerified = $this->isCertificateVerified($certificate->isVerified);
 
             return response()->json(['message' => 'Certificate retrieved successfully', 'data' => $certificate], 200);

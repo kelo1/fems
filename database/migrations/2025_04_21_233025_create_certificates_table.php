@@ -17,10 +17,12 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('certificate_id'); // Foreign key to certificate_types
             $table->string('serial_number')->unique(); // Unique serial number for the certificate
-            $table->unsignedBigInteger('client_id'); // Required
-            $table->unsignedBigInteger('fsa_id'); // Foreign key to fire_service_agents
-            $table->boolean('isVerified')->default(false); // Indicates if the certificate is verified by FEMS Admin
+            $table->unsignedBigInteger('client_id')->nullable(); // Required
+            $table->unsignedBigInteger('fsa_id')->nullable(); // Allow NULL values for the foreign key            $table->boolean('isVerified')->default(false); // Indicates if the certificate is verified by FEMS Admin
             $table->string('certificate_upload')->nullable(); // Path to the uploaded certificate
+            $table->date('issued_date'); // Date when the certificate was issued
+            $table->date('expiry_date'); // Date when the certificate expires
+            $table->string('status')->default('active'); // Status of the certificate (active, expired, etc.)
             $table->unsignedBigInteger('created_by');
             $table->string('created_by_type');
             $table->timestamps();
