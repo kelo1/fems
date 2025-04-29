@@ -28,7 +28,7 @@ class CertificateController extends Controller
         }
         
 
-        $certificates = Certificate::with('certificateType', 'fireServiceAgent')->get();
+        $certificates = Certificate::with('certificateType', 'fireServiceAgent', 'client')->get();
         return response()->json(['data' => $certificates], 200);
     }
 
