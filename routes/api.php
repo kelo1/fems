@@ -206,7 +206,7 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::get('/certificate/all', [CertificateController::class, 'index'])->name('all_certificates');
   Route::post('/certificate/create', [CertificateController::class, 'store'])->name('create_certificate');
   Route::put('/certificate/update/{id}', [CertificateController::class, 'update'])->name('update_certificate');
-  Route::delete('/certificate/{id}', [CertificateController::class, 'delete'])->name('delete_certificate');
+  Route::delete('/certificate/{id}', [CertificateController::class, 'destroy'])->name('delete_certificate');
   Route::get('/certificate/{id}', [CertificateController::class, 'getCertificateByID'])->name('certificate_show');
   Route::get('/certificate/client/{client_id}', [CertificateController::class, 'getCertificateByClientID'])->name('certificate_by_client');
   Route::get('/certificates/type/{certificate_type_id}', [CertificateController::class, 'getCertificateByCertificateType']);
