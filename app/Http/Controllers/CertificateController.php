@@ -33,9 +33,12 @@ class CertificateController extends Controller
         $certificates = $certificates->map(function ($certificate) {
             if ($certificate->client) {
                 if ($certificate->client->client_type === 'INDIVIDUAL') {
-                    $certificate->client->name = \DB::table('individual_clients')
+                    $individualClient = \DB::table('individual_clients')
                         ->where('client_id', $certificate->client->id)
-                        ->value('first_name');
+                        ->first(['first_name', 'middle_name', 'last_name']);
+                    $certificate->client->name = $individualClient
+                        ? trim("{$individualClient->first_name} {$individualClient->middle_name} {$individualClient->last_name}")
+                        : null;
                 } elseif ($certificate->client->client_type === 'CORPORATE') {
                     $certificate->client->name = \DB::table('corporate_clients')
                         ->where('client_id', $certificate->client->id)
@@ -299,9 +302,12 @@ class CertificateController extends Controller
             $certificates = $certificates->map(function ($certificate) {
                 if ($certificate->client) {
                     if ($certificate->client->client_type === 'INDIVIDUAL') {
-                        $certificate->client->name = \DB::table('individual_clients')
+                        $individualClient = \DB::table('individual_clients')
                             ->where('client_id', $certificate->client->id)
-                            ->value('first_name');
+                            ->first(['first_name', 'middle_name', 'last_name']);
+                        $certificate->client->name = $individualClient
+                            ? trim("{$individualClient->first_name} {$individualClient->middle_name} {$individualClient->last_name}")
+                            : null;
                     } elseif ($certificate->client->client_type === 'CORPORATE') {
                         $certificate->client->name = \DB::table('corporate_clients')
                             ->where('client_id', $certificate->client->id)
@@ -347,9 +353,12 @@ class CertificateController extends Controller
             // Add client name based on client_type
             if ($certificate->client) {
                 if ($certificate->client->client_type === 'INDIVIDUAL') {
-                    $certificate->client->name = \DB::table('individual_clients')
+                    $individualClient = \DB::table('individual_clients')
                         ->where('client_id', $certificate->client->id)
-                        ->value('first_name');
+                        ->first(['first_name', 'middle_name', 'last_name']);
+                    $certificate->client->name = $individualClient
+                        ? trim("{$individualClient->first_name} {$individualClient->middle_name} {$individualClient->last_name}")
+                        : null;
                 } elseif ($certificate->client->client_type === 'CORPORATE') {
                     $certificate->client->name = \DB::table('corporate_clients')
                         ->where('client_id', $certificate->client->id)
