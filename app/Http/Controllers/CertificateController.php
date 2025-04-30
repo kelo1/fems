@@ -26,9 +26,25 @@ class CertificateController extends Controller
         if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
-        
 
         $certificates = Certificate::with('certificateType', 'fireServiceAgent', 'client')->get();
+
+        // Add client name based on client_type
+        $certificates = $certificates->map(function ($certificate) {
+            if ($certificate->client) {
+                if ($certificate->client->client_type === 'INDIVIDUAL') {
+                    $certificate->client->name = \DB::table('individual_clients')
+                        ->where('client_id', $certificate->client->id)
+                        ->value('first_name');
+                } elseif ($certificate->client->client_type === 'CORPORATE') {
+                    $certificate->client->name = \DB::table('corporate_clients')
+                        ->where('client_id', $certificate->client->id)
+                        ->value('company_name');
+                }
+            }
+            return $certificate;
+        });
+
         return response()->json(['data' => $certificates], 200);
     }
 
@@ -279,13 +295,19 @@ class CertificateController extends Controller
                 return response()->json(['message' => 'No certificates found for the specified client'], 404);
             }
 
-            // Check if each certificate has expired and update the status if necessary
+            // Add client name based on client_type
             $certificates = $certificates->map(function ($certificate) {
-                if (now()->greaterThan($certificate->expiry_date)) {
-                    $certificate->status = 'expired';
-                    $certificate->save(); // Update the status in the database
+                if ($certificate->client) {
+                    if ($certificate->client->client_type === 'INDIVIDUAL') {
+                        $certificate->client->name = \DB::table('individual_clients')
+                            ->where('client_id', $certificate->client->id)
+                            ->value('first_name');
+                    } elseif ($certificate->client->client_type === 'CORPORATE') {
+                        $certificate->client->name = \DB::table('corporate_clients')
+                            ->where('client_id', $certificate->client->id)
+                            ->value('company_name');
+                    }
                 }
-                $certificate->isVerified = $this->isCertificateVerified($certificate->isVerified);
                 return $certificate;
             });
 
@@ -320,6 +342,19 @@ class CertificateController extends Controller
             if (now()->greaterThan($certificate->expiry_date)) {
                 $certificate->status = 'expired';
                 $certificate->save(); // Update the status in the database
+            }
+
+            // Add client name based on client_type
+            if ($certificate->client) {
+                if ($certificate->client->client_type === 'INDIVIDUAL') {
+                    $certificate->client->name = \DB::table('individual_clients')
+                        ->where('client_id', $certificate->client->id)
+                        ->value('first_name');
+                } elseif ($certificate->client->client_type === 'CORPORATE') {
+                    $certificate->client->name = \DB::table('corporate_clients')
+                        ->where('client_id', $certificate->client->id)
+                        ->value('company_name');
+                }
             }
 
             $certificate->isVerified = $this->isCertificateVerified($certificate->isVerified);
