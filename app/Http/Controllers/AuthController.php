@@ -7,6 +7,10 @@ use App\Models\FireServiceAgent;
 use App\Models\GRA;
 use App\Models\LicenseType;
 use App\Models\FEMSAdmin;
+use App\Models\Certificate;
+use App\Models\Invoicing;
+use App\Models\Equipment;
+use App\Models\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -504,4 +508,150 @@ class AuthController extends Controller
         }
     }
     
+    public function adminDashboard()
+    {
+        try {
+            // Ensure the authenticated user is a FEMSAdmin
+            $admin = Auth::user();
+            if (get_class($admin) != "App\Models\FEMSAdmin") {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            // Fetch the required statistics
+            $totalEquipments = Equipment::count(); // Total number of equipments
+            $activeEquipments = Equipment::where('isActive', true)->count(); // Active equipments
+            $inactiveEquipments = Equipment::where('isActive', false)->count(); // Inactive equipments
+            $totalServiceProviders = ServiceProvider::count(); // Total number of service providers
+            $totalFireServiceAgents = FireServiceAgent::count(); // Total number of fire service agents
+            $totalGRAs = GRA::count(); // Total number of GRAs
+            $totalCertificates = Certificate::count(); // Total number of certificates
+            $verifiedCertificates = Certificate::where('isVerified', true)->count(); // Verified certificates
+            $unverifiedCertificates = $totalCertificates - $verifiedCertificates; // Not verified certificates
+            $totalInvoices = Invoicing::count(); // Total number of invoices
+
+            // Return the statistics
+            return response()->json([
+                'message' => 'Dashboard statistics retrieved successfully',
+                'data' => [
+                    'total_equipments' => $totalEquipments,
+                    'active_equipments' => $activeEquipments,
+                    'inactive_equipments' => $inactiveEquipments,
+                    'total_certificates' => $totalCertificates,
+                    'verified_certificates' => $verifiedCertificates,
+                    'unverified_certificates' => $unverifiedCertificates,
+                    'total_invoices' => $totalInvoices,
+                    'total_service_providers' => $totalServiceProviders,
+                    'total_fire_service_agents' => $totalFireServiceAgents,
+                    'total_gras' => $totalGRAs,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error in dashboard method', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'An error occurred while retrieving dashboard statistics'], 500);
+        }
+    }
+
+    /**
+     * Show the dashboard for GRA personnel.
+     *
+     * @return \Illuminate\Http\Response
+     */
+
+    public function graDashboard()
+    {
+        try {
+            // Ensure the authenticated user is a GRA
+            $gra = Auth::user();
+            if (get_class($gra) != "App\Models\GRA") {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            // Fetch the required statistics
+            $totalInvoices = Invoicing::count(); // Total number of invoices
+
+            // Return the statistics
+            return response()->json([
+                'message' => 'Dashboard statistics retrieved successfully',
+                'data' => [
+                    'total_invoices' => $totalInvoices,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error in dashboard method', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'An error occurred while retrieving dashboard statistics'], 500);
+        }
+    }
+
+    public function serviceProviderDashboard()
+    {
+        try {
+            // Ensure the authenticated user is a Service Provider
+            $serviceProvider = Auth::user();
+            if (get_class($serviceProvider) != "App\Models\ServiceProvider") {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            // Fetch the required statistics
+            $totalEquipments = Equipment::where('service_provider_id', $serviceProvider->id)->count(); // Total number of equipments by the service provider
+            $activeEquipments = Equipment::where('service_provider_id', $serviceProvider->id)->where('isActive', true)->count(); // Active equipments by the service provider
+            $inactiveEquipments = Equipment::where('service_provider_id', $serviceProvider->id)->where('isActive', false)->count(); // Inactive equipments by the service provider
+            $totalInvoices = Invoicing::where('service_provider_id', $serviceProvider->id)->count(); // Total number of invoices by the service provider
+            $totalClients = Client::where('created_by', $serviceProvider->id)->count(); // Total number of clients
+            $totalIndividualClients = Client::where('created_by', $serviceProvider->id)->where('client_type', 'INDIVIDUAL')->count(); // Total number of individual clients created by the service provider
+            $totalCorporateClients = Client::where('created_by', $serviceProvider->id)->where('client_type', 'CORPORATE')->count(); // Total number of corporate clients created by the service provider
+
+            // Return the statistics
+            return response()->json([
+                'message' => 'Dashboard statistics retrieved successfully',
+                'data' => [
+                    'total_equipments' => $totalEquipments,
+                    'active_equipments' => $activeEquipments,
+                    'inactive_equipments' => $inactiveEquipments,
+                    'total_invoices' => $totalInvoices,
+                    'total_clients' => $totalClients,
+                    'total_individual_clients' => $totalIndividualClients,
+                    'total_corporate_clients' => $totalCorporateClients,
+
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error in dashboard method', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'An error occurred while retrieving dashboard statistics'], 500);
+        }
+    }
+
+    public function fireServiceAgentDashboard()
+    {
+        try {
+            // Ensure the authenticated user is a Fire Service Agent
+            $fireServiceAgent = Auth::user();
+            if (get_class($fireServiceAgent) != "App\Models\FireServiceAgent") {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            // Fetch the required statistics
+            $totalCertificates = Certificate::where('fsa_id', $fireServiceAgent->id)->count(); // Total number of certificates by the fire service agent
+            $verifiedCertificates = Certificate::where('isVerified', true)->where('fsa_id', $fireServiceAgent->id)->count(); // Verified certificates by the fire service agent
+            $unverifiedCertificates = $totalCertificates - $verifiedCertificates; //  Unverified certificates by the fire service agent
+            $totalNewCertificates = Certificate::where('certificate_id', 1)->where('fsa_id', $fireServiceAgent->id)->count(); // Total number of new certificates by the fire service agent
+            $FirePermitCertificates = Certificate::where('certificate_id', 2)->where('fsa_id', $fireServiceAgent->id)->count(); // Total number of Fire Permit certificates by the fire service agent
+            $RenewalCertificates = Certificate::where('certificate_id', 3)->where('fsa_id', $fireServiceAgent->id)->count(); // Total number of renewal certificates by the fire service agent
+            
+            // Return the statistics
+            return response()->json([
+                'message' => 'Dashboard statistics retrieved successfully',
+                'data' => [
+                    'total_certificates' => $totalCertificates,
+                    'verified_certificates' => $verifiedCertificates,
+                    'unverified_certificates' => $unverifiedCertificates,
+                    'total_new_certificates' => $totalNewCertificates,
+                    'fire_permit_certificates' => $FirePermitCertificates,
+                    'renewal_certificates' => $RenewalCertificates,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error in dashboard method', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'An error occurred while retrieving dashboard statistics'], 500);
+        }
+    }
 }

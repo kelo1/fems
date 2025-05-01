@@ -88,7 +88,13 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::put('/user/update_user/{id}', [AuthController::class, 'update'])->name('user_update');
   Route::delete('/user/delete_user/{id}', [AuthController::class, 'destroy'])->name('user_delete');
   Route::post('/user/show_by_user_type', [AuthController::class, 'showbyUserType'])->name('user_show');
-  
+
+  //Protected User Dashboard Routes
+  Route::get('/FEMSAdmin/dashboard', [AuthController::class, 'adminDashboard'])->name('user_dashboard');
+  Route::get('/service_provider/dashboard', [AuthController::class, 'serviceProviderDashboard'])->name('service_provider_dashboard');
+  Route::get('/fire_service_agent/dashboard', [AuthController::class, 'fireServiceAgentDashboard'])->name('fire_service_agent_dashboard');
+  Route::get('/gra/dashboard', [AuthController::class, 'graDashboard'])->name('gra_dashboard');
+
   //Protected Client Routes
   Route::post('/client/create_corporate_client', [ClientController::class, 'createCorporateClient'])->name('register_corporate_client');
   Route::post('/client/create_individual_client', [ClientController::class, 'createIndividualClient'])->name('register_individual_client');
