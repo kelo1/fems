@@ -31,7 +31,34 @@ class CorporateClientsController extends Controller
     //Display all Corporate clients
      public function index()
      {
-        return Corporate_clients::all();
+
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+        // Check if the user has the required role
+        if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        try {
+            // Retrieve all corporate clients with their associated corporate_clients and service_provider details
+            $corporateClients = Client::where('client_type', 'CORPORATE')
+                ->with([
+                    'corporateDetails', // Relationship to the corporate_clients table
+                    'createdBy',       // Relationship to the service_provider who created the client
+                ])
+                ->get();
+    
+            // Return the response
+            return response()->json([
+                'message' => 'Corporate clients retrieved successfully',
+                'data' => $corporateClients,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve corporate clients', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to retrieve corporate clients'], 500);
+        }
      }
 
       // Get all corporate clients
@@ -44,7 +71,7 @@ class CorporateClientsController extends Controller
         }
 
         try {
-            // Retrieve all corporate clients with their associated client and corporate type details
+          
             $corporateClients = Corporate_clients::with('client', 'corporateType')
             ->whereHas('client', function ($query) use ($user) {
                 $query->where('created_by', $user->id) // Filter by created_by in the clients table
@@ -72,6 +99,8 @@ class CorporateClientsController extends Controller
                 'message' => 'Corporate clients retrieved successfully',
                 'data' => $corporateClientsWithUrls,
             ], 200);
+
+        
         } catch (\Exception $e) {
             Log::error('Failed to retrieve corporate clients', ['error' => $e->getMessage()]);
             return response()->json(['message' => 'Failed to retrieve corporate clients'], 500);

@@ -31,7 +31,32 @@ class IndividualClientsController extends Controller
     //Display all individual clients
     public function index(){
 
-        return Individual_clients::all();
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+        // Check if the user has the required role
+        if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        try {
+            // Retrieve all corporate clients with their associated corporate_clients and service_provider details
+            $individualClients = Client::where('client_type', 'INDIVIDUAL')
+                ->with([
+                    'individualClient', // Relationship to the corporate_clients table
+                    'createdBy',       // Relationship to the service_provider who created the client
+                ])
+                ->get();
+    
+            // Return the response
+            return response()->json([
+                'message' => 'Individual clients retrieved successfully',
+                'data' => $individualClients,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve corporate clients', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to retrieve corporate clients'], 500);
+        }
     }
 
 

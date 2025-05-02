@@ -114,12 +114,14 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   //Protected Corporate Client Routes
   Route::get('/client/corporate_clients', [CorporateClientsController::class, 'getCorporateClients'])->name('all_corporate_clients');
   Route::get('/client/corporate_clients/{id}', [CorporateClientsController::class, 'getCorporateClientByID'])->name('corporate_client_by_id');  
-  
+  Route::get('/corporate_clients', [CorporateClientsController::class, 'index'])->name('all_corporate_clients_admin');
+
 
   // Individual Clients Routes
   Route::get('/client/individual_clients', [IndividualClientsController::class, 'getIndividualClients'])->name('all_individual_clients');
   Route::get('/client/individual_clients/{id}', [IndividualClientsController::class, 'getIndividualClientsByID'])->name('individual_client_by_id');
 
+  Route::get('/individual_clients', [IndividualClientsController::class, 'index'])->name('all_individual_clients_admin');
 
   
   //Protected FEMS Admin Routes

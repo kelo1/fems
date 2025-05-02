@@ -52,6 +52,11 @@ class Client extends Model
         return $this->hasOne(Corporate_clients::class, 'client_id');
     }
 
+    public function createdBy()
+    {
+        return $this->belongsTo(ServiceProvider::class, 'created_by');
+    }
+
     public function equipment()
     {
         return $this->hasMany(Equipment::class);
