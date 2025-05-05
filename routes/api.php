@@ -202,6 +202,7 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::get('/service_provider_device/all', [ServiceProviderDevicesController::class, 'index'])->name('all_service_provider_devices');
   Route::post('/service_provider_device/create', [ServiceProviderDevicesController::class, 'store'])->name('create_service_provider_device');
   Route::put('/service_provider_device/update/{id}', [ServiceProviderDevicesController::class, 'update'])->name('update_service_provider_device');
+  Route::get('/service_provider_device/{id}', [ServiceProviderDevicesController::class, 'show'])->name('service_provider_devices_show');
 
   //Protected Certificate Types Routes
   Route::get('/certificate_type/all', [CertificateTypeController::class, 'index'])->name('all_certificate_types');

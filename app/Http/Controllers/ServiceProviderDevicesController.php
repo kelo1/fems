@@ -9,7 +9,9 @@ class ServiceProviderDevicesController extends Controller
 {
     public function index()
     {
-        $devices = ServiceProviderDevice::all();
+        // Retrieve all devices with their associated service provider details
+        $devices = ServiceProviderDevice::with('serviceProvider')->get();
+
         return response()->json(['data' => $devices], 200);
     }
 
@@ -86,6 +88,33 @@ class ServiceProviderDevicesController extends Controller
         }
     }
 
+    public function show($id)
+    {
+        try {
+            // Retrieve the device by ID with its associated service provider
+            $device = ServiceProviderDevice::with('serviceProvider')->findOrFail($id);
+
+            return response()->json([
+                'message' => 'Device retrieved successfully',
+                'data' => $device,
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            // Log model not found errors
+            \Log::error('Device not found in show method', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['message' => 'Device not found', 'error' => $e->getMessage()], 404);
+        } catch (\Exception $e) {
+            // Log general errors
+            \Log::error('Error retrieving device', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['message' => 'Failed to retrieve device', 'error' => $e->getMessage()], 500);
+        }
+    }
+
     /**
      * Generate a unique device serial number.
      *
@@ -95,7 +124,7 @@ class ServiceProviderDevicesController extends Controller
     {
         do {
             // Generate a random alphanumeric string (e.g., "DEV-ABC123XYZ")
-            $serialNumber = 'DEV-' . strtoupper(substr(bin2hex(random_bytes(6)), 0, 12));
+            $serialNumber = 'DEV-' . strtoupper(substr(bin2hex(random_bytes(6)), 0, 13));
         } while (ServiceProviderDevice::where('device_serial_number', $serialNumber)->exists());
 
         return $serialNumber;
