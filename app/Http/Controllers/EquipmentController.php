@@ -6,6 +6,8 @@ use App\Models\Equipment;
 use App\Models\EquipmentClient;
 use App\Models\EquipmentServiceProvider;
 use App\Models\ServiceProvider;
+use App\Http\Controllers\IndividualClientsController;
+use App\Http\Controllers\CorporateClientsController;
 use App\Models\Client;
 use App\Models\QRCode;
 use App\Models\FEMSAdmin;
@@ -720,11 +722,22 @@ public function getEquipmentBySerialNumber($serial_number)
 {
     try {
         // Retrieve the equipment record by serial number
-        $equipment = Equipment::where('serial_number', $serial_number)->first();
+      //  $equipment = Equipment::where('serial_number', $serial_number)->first();
+
+         $equipment = Equipment::with([
+                'equipmentClients' => function ($query) {
+                    $query->where('status_client', 1); // Only active clients
+                },
+                'equipmentServiceProviders' => function ($query) {
+                    $query->where('status_service_provider', 1); // Only active service providers
+                }
+                ])->where('serial_number', $serial_number)->firstOrFail();
 
         if (!$equipment) {
             return response()->json(['message' => 'Equipment not found'], 404);
         }
+
+        $equipment->makeHidden(['equipmentClients', 'equipmentServiceProviders']);
 
         // Determine the equipment status
         $equipmentStatus = $this->determineEquipmentStatus($equipment->id);
@@ -743,11 +756,26 @@ public function getEquipmentBySerialNumber($serial_number)
             }
         }
 
+         // Add service provider names to the service_providers object
+            $serviceProviders = $equipment->equipmentServiceProviders->map(function ($serviceProvider) {
+                $serviceProviderDetails = ServiceProvider::find($serviceProvider->service_provider_id);
+                $serviceProvider->name = $serviceProviderDetails ? $serviceProviderDetails->name : null;
+                return $serviceProvider;
+            });
+
         // Add status and client_name to the equipment object
         $equipment->equipment_status = $equipmentStatus;
-        $equipment->client_name = $clientName;
+        $equipment->makeHidden(['equipmentClients', 'equipmentServiceProviders']);
+        // Format the response
+        $response = [
+            'equipment' => $equipment,
+            'client_name' => $clientName,
+            'service_providers' => $serviceProviders,
+            'equipment_status' => $equipmentStatus,
+        ];
+        // Add equipment status to the response
 
-        return response()->json(['message' => 'Equipment retrieved successfully', 'data' => $equipment], 200);
+        return response()->json(['message' => 'Equipment retrieved successfully', 'data' => $response], 200);
     } catch (\Exception $e) {
         // Log the error
         \Log::error('Error in getEquipmentBySerialNumber method', [
@@ -758,4 +786,89 @@ public function getEquipmentBySerialNumber($serial_number)
         return response()->json(['message' => 'An error occurred while retrieving the equipment'], 500);
     }
 }
+
+public function createIndividualClientEquipment(Request $request, $serial_number)
+{
+    try {
+        
+        // Retrieve the equipment record by serial number
+        $equipment = Equipment::where('serial_number', $serial_number)->firstOrFail();
+
+        // Ensure the client_id column is null
+        if (!is_null($equipment->client_id)) {
+            return response()->json(['message' => 'Equipment already has a client assigned'], 400);
+        }
+
+        // Use the IndividualClientsController's store method to create the client
+        $individualClientController = new IndividualClientsController();
+        $clientResponse = $individualClientController->store($request);
+        
+        // Decode the response content
+        $clientData = json_decode($clientResponse->getContent());
+
+        // Check if the response contains the expected data
+        if (!isset($clientData->client)) {
+            return response()->json(['message' => 'Failed to create Individual client'], 500);
+        }
+
+        // Assign the client data to the $client variable
+        $client = $clientData->client;
+
+        // Assign the client_id to the equipment
+        $equipment->client_id = $client->id;
+        $equipment->save();
+
+        return response()->json(['message' => 'Individual client created and assigned to equipment successfully', 'client' => $client], 201);
+    } catch (\Exception $e) {
+        \Log::error('Error in createIndividualClientEquipment method', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+
+        return response()->json(['message' => 'An error occurred while creating the individual client'], 500);
+    }
+}
+
+public function createCorporateClientEquipment(Request $request, $serial_number)
+{
+    try {
+      
+
+        // Retrieve the equipment record by serial number
+        $equipment = Equipment::where('serial_number', $serial_number)->firstOrFail();
+
+        // Ensure the client_id column is null
+        if (!is_null($equipment->client_id)) {
+            return response()->json(['message' => 'Equipment already has a client assigned'], 400);
+        }
+
+        // Use the CorporateClientsController's store method to create the client
+        $corporateClientController = new CorporateClientsController();
+        $clientResponse = $corporateClientController->store($request);
+
+        // Decode the response content
+        $clientData = json_decode($clientResponse->getContent());
+
+        // Check if the response contains the expected data
+        if (!isset($clientData->client)) {
+            return response()->json(['message' => 'Failed to create corporate client'], 500);
+        }
+
+        // Assign the client data to the $client variable
+        $client = $clientData->client;
+        // Assign the client_id to the equipment
+        $equipment->client_id = $clientData->client->id;
+        $equipment->save();
+
+        return response()->json(['message' => 'Corporate client created and assigned to equipment successfully', 'client' => $client], 201);
+    } catch (\Exception $e) {
+        \Log::error('Error in createCorporateClientEquipment method', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+
+        return response()->json(['message' => 'An error occurred while creating the corporate client'], 500);
+    }
+}
+
 }

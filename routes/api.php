@@ -179,6 +179,11 @@ Route::group(['middleware'=>['web','auth:sanctum']], function(){
   Route::get('/equipment/details/{id}', [EquipmentController::class, 'getEquipmentByID'])->name('equipment_details');
   Route::get('/equipment/serial_number/{serial_number}', [EquipmentController::class, 'getEquipmentBySerialNumber'])->name('equipment_by_serial_number');
   Route::get('/equipment/history/{equipment_id}', [EquipmentController::class, 'getEquipmentHistory'])->name('equipment_history');
+  Route::post('/equipment/createIndividualClient/{serial_number}', [EquipmentController::class, 'createIndividualClientEquipment'])->name('create_individualclient_equipment');
+  Route::post('/equipment/createCorporateClient/{serial_number}', [EquipmentController::class, 'createCorporateClientEquipment'])->name('create_individualclient_equipment');
+
+
+
 
   //Protected QR Code Routes
   Route::post('/qrcode/equipment/{serial_number}', [QRCodeController::class, 'generateEquipmentQrCode'])->name('generate_qr_code');
