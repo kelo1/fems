@@ -15,4 +15,9 @@ class CertificateType extends Model
         'created_by',
         'created_by_type',
     ];
+
+    public function fems_admin()
+    {
+        return $this->belongsTo(FEMSAdmin::class, 'created_by');
+    }
 }

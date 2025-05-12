@@ -70,18 +70,19 @@ class IndividualClientsController extends Controller
         try {
             // Retrieve all individual clients with their associated client details
             $individualClients = Individual_clients::with('client')
-            ->whereHas('client', function ($query) use ($user) {
-                $query->where('created_by', $user->id)
-                      ->where('created_by_type', get_class($user)); // Filter by created_by in the clients table
-            })
-            ->get();
+                ->whereHas('client', function ($query) use ($user) {
+                    $query->where('created_by', $user->id)
+                          ->where('created_by_type', get_class($user)); // Filter by created_by in the clients table
+                })
+                ->get();
+
             // Get the base URL from the environment variable
-            $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
+            $baseURL = env('AWS_URL', config('filesystems.disks.s3.url')); // Fallback to S3 URL if AWS_URL is not set
 
             // Add document URL to each individual client
             $individualClientsWithDocumentUrl = $individualClients->map(function ($individualClient) use ($baseURL) {
                 $individualClient->document_url = $individualClient->document
-                    ? $baseURL . Storage::url('uploads/individual_clients/' . $individualClient->document)
+                    ? $baseURL . '/uploads/individual_clients/' . $individualClient->document
                     : null;
                 return $individualClient;
             });
@@ -107,11 +108,11 @@ class IndividualClientsController extends Controller
             }
 
             // Get the base URL from the environment variable
-            $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
+            $baseURL = env('AWS_URL', config('filesystems.disks.s3.url')); // Fallback to S3 URL if AWS_URL is not set
 
             // Add document URL to the individual client
             $individualClient->document_url = $individualClient->document
-                ? $baseURL . Storage::url('uploads/individual_clients/' . $individualClient->document)
+                ? $baseURL . '/uploads/individual_clients/' . $individualClient->document
                 : null;
 
             return response()->json([
@@ -139,25 +140,38 @@ class IndividualClientsController extends Controller
         $user = Auth::user();
 
         if (!$user) {
+            Log::error('Unauthorized access attempt to store individual client.');
             return response(['message' => 'Unauthorized'], 403);
         }
 
         // Validate client and individual client details
-        $request->validate([
-            'email' => 'required|email|unique:clients,email',
-            'phone' => 'required|string|max:15|unique:clients,phone',
-            'client_type' => 'required|string|exists:customer_types,name',
-            'first_name' => 'required|string|max:255',
-            'middle_name' => 'nullable|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'address' => 'required|string|max:255',
-            'gps_address' => 'nullable|string|max:255',
-            'document_type' => 'required|string|in:PASSPORT,NATIONAL_ID',
-            'document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
-        ]);
+        try {
+            $request->validate([
+                'email' => 'required|email|unique:clients,email',
+                'phone' => 'required|string|max:15|unique:clients,phone',
+                'client_type' => 'required|string|exists:customer_types,name',
+                'first_name' => 'required|string|max:255',
+                'middle_name' => 'nullable|string|max:255',
+                'last_name' => 'required|string|max:255',
+                'address' => 'required|string|max:255',
+                'gps_address' => 'nullable|string|max:255',
+                'document_type' => 'required|string|in:PASSPORT,NATIONAL_ID',
+                'document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
+            ]);
+            Log::info('Validation passed successfully.', ['request_data' => $request->all()]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('Validation failed.', ['errors' => $e->errors()]);
+            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+        }
+        
+        Log::info('Validation passed successfully.', ['request_data' => $request->all()]);
+
+        \DB::beginTransaction();
+        Log::info('Starting transaction to store individual client.');
 
         try {
-            \DB::beginTransaction();
+           
+            
 
             $otp = $this->generateOTP();
             $email_verification = Str::uuid()->toString();
@@ -174,29 +188,41 @@ class IndividualClientsController extends Controller
                 'created_by_type' => get_class($user), // Store the type of user who created the client
             ]);
 
+            if (!$client) {
+                Log::error('Failed to create client record.', ['request_data' => $request->all()]);
+                \DB::rollBack();
+                return response()->json(['message' => 'Failed to create client record'], 500);
+            }
+
+            Log::info('Client record created successfully.', ['client_id' => $client->id]);
+
             // Check if client_type is individual
             if ($request->client_type !== 'INDIVIDUAL') {
+                Log::error('Client type is not INDIVIDUAL.', ['client_type' => $request->client_type]);
                 \DB::rollBack();
                 return response()->json(['message' => 'Client type must be INDIVIDUAL'], 422);
             }
-
-            // Log the creation of the client
-            Log::info('Client details stored', ['client_id' => $client->id]);
 
             // Handle file uploads for document
             $documentFileName = null;
             $documentUrl = null;
 
             if ($request->hasFile('document')) {
+                Log::info('Document file detected. Processing upload.');
+
                 $file = $request->file('document');
                 $documentFileName = strtolower($request->document_type) . '_upload_' . $client->id . '_' . Str::slug($request->first_name . ' ' . $request->last_name) . '_' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
-                $file->storeAs('uploads/individual_clients', $documentFileName, 'public');
-                $documentUrl = Storage::url('uploads/individual_clients/' . $documentFileName);
-                
+
+                $file->storeAs('uploads/individual_clients', $documentFileName, 's3');
+                $documentUrl = env('AWS_URL') . '/uploads/individual_clients/' . $documentFileName;
+
+                Log::info('Document uploaded successfully.', ['document_url' => $documentUrl]);
+            } else {
+                Log::info('No document file uploaded.');
             }
 
             // Store individual client details
-            Individual_clients::create([
+            $individualClient = Individual_clients::create([
                 'first_name' => $request->first_name,
                 'middle_name' => $request->middle_name,
                 'last_name' => $request->last_name,
@@ -207,9 +233,17 @@ class IndividualClientsController extends Controller
                 'client_id' => $client->id,
             ]);
 
-            Log::info('Individual client details stored', ['client_id' => $client->id]);
+            if (!$individualClient) {
+                Log::error('Failed to create individual client record.', ['client_id' => $client->id]);
+                \DB::rollBack();
+                return response()->json(['message' => 'Failed to create individual client record'], 500);
+            }
+
+            Log::info('Individual client record created successfully.', ['client_id' => $client->id]);
 
             \DB::commit();
+
+            Log::info('Transaction committed successfully.');
 
             return response()->json([
                 'message' => 'Individual client created successfully',
@@ -218,7 +252,10 @@ class IndividualClientsController extends Controller
             ], 201);
         } catch (\Exception $e) {
             \DB::rollBack();
-            Log::error('Failed to create individual client', ['error' => $e->getMessage()]);
+            Log::error('Failed to create individual client.', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return response()->json(['message' => 'Failed to create individual client'], 500);
         }
     }

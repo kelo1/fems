@@ -9,6 +9,7 @@ use App\Models\LicenseType;
 use App\Models\FEMSAdmin;
 use App\Models\Certificate;
 use App\Models\Invoicing;
+use App\Models\InvoicesbyFSA;
 use App\Models\Equipment;
 use App\Models\Client;
 use Illuminate\Http\Request;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -33,7 +35,7 @@ class AuthController extends Controller
          // Ensure the authenticated user is a FEMSAdmin
          if (!$admin instanceof FEMSAdmin) {
              \Log::warning('Unauthorized attempt to update isActive', ['auth_user' => $admin]);
-             return response()->json(['message' => 'You\'re Unauthorized to perform this action'], 401);
+             return response()->json(['message' => 'You\'re Unauthorized to perform this action'], 403);
          }
 
         // Check authorization using policy
@@ -51,6 +53,60 @@ class AuthController extends Controller
             'fire_service_agents' => $fireServiceAgents,
             'gras' => $gras,
         ]);
+    }
+
+
+    public function getUserByID(Request $request, $id){
+
+        // Get the authenticated admin
+        $admin = Auth::user();
+    
+        if (!$admin) {
+            return response()->json(['message' => 'Unauthorized: Admin user not found'], 401);
+        }
+
+        // Ensure the authenticated user is a FEMSAdmin
+        if (get_class($admin) != "App\Models\FEMSAdmin") {
+            \Log::warning('Unauthorized attempt to update isActive', ['auth_user' => $admin]);
+            return response()->json(['message' => 'You\'re Unauthorized to perform this action'], 403);
+        }
+
+
+        // Validate the user_type field
+        $fields = $request->validate([
+            'user_type' => 'required|string|in:SERVICE_PROVIDER,FSA_AGENT,GRA_PERSONNEL',
+        ]);
+
+        $userType = strtoupper($fields['user_type']);
+
+        // Map user types to their respective models
+        $modelMap = [
+            'SERVICE_PROVIDER' => \App\Models\ServiceProvider::class,
+            'FSA_AGENT' => \App\Models\FireServiceAgent::class,
+            'GRA_PERSONNEL' => \App\Models\GRA::class,
+        ];
+
+        $model = $modelMap[$userType] ?? null;
+
+        if (!$model) {
+            return response()->json(['message' => 'Invalid user type provided'], 400);
+        }
+
+        // Retrieve the user by email
+        $user = $model::where('id', $id)->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+        else{
+
+            return response()->json([
+                'user_type' => $fields['user_type'],
+                'user' => $user,
+            ]);
+        }
+
+
     }
 
 
@@ -86,6 +142,9 @@ class AuthController extends Controller
     
     // Create user
     $user = null;
+    $email_verification = Str::uuid()->toString();
+
+    $otp = $this->generateOTP($request->user_type);
 
     try {
         DB::beginTransaction();
@@ -108,6 +167,8 @@ class AuthController extends Controller
                 'address' => $request->address,
                 'email' => $request->email,
                 'phone' => $request->phone,
+                'OTP' => $otp,
+                'email_token' => $email_verification,
                 'gps_address' => $request->gps_address,
                 'password' => Hash::make($request->password),
                 'license_id' => $request->license_id,
@@ -123,6 +184,8 @@ class AuthController extends Controller
                 'address' => $request->address,
                 'email' => $request->email,
                 'phone' => $request->phone,
+                'OTP' => $otp,
+                'email_token' => $email_verification,
                 'gps_address' => $request->gps_address,
                 'password' => Hash::make($request->password),
             ]);
@@ -137,6 +200,8 @@ class AuthController extends Controller
                 'address' => $request->address,
                 'email' => $request->email,
                 'phone' => $request->phone,
+                'OTP' => $otp,
+                'email_token' => $email_verification,
                 'gps_address' => $request->gps_address,
                 'password' => Hash::make($request->password),
             ]);
@@ -150,6 +215,15 @@ class AuthController extends Controller
             return response()->json(['error' => 'Failed to create user'], 500);
         }
 
+        // Send OTP via AWS SNS
+        $this->sendOtpToPhone($user->phone, $otp);
+
+        // Send password notification
+      //  $user->notify(new \App\Notifications\SendPasswordNotification($request->password));
+
+        // Send email verification notification
+        $user->notify(new \App\Notifications\VerifyEmailNotification($user, $request->name, $request->email, $email_verification, $request->user_type));
+
         DB::commit();
         return response()->json(['message' => 'User registered successfully', 'user' => $user], 201);
 
@@ -160,8 +234,97 @@ class AuthController extends Controller
     }
     }
 
-     
+ /*   private function sendOtpToPhone($phone, $otp)
+{
+    try {
+        // Format the phone number (e.g., for Ghana, prepend +233)
+        $formattedPhone = preg_replace('~^(?:0|\+?233)?~', '+233', $phone);
 
+        // Twilio client configuration
+        $twilioSid = env('TWILIO_SID');
+        $twilioToken = env('TWILIO_AUTH_TOKEN');
+        $twilioFrom = env('TWILIO_PHONE_NUMBER');
+
+        $twilio = new \Twilio\Rest\Client($twilioSid, $twilioToken);
+
+        // Send the SMS
+        $twilio->messages->create(
+            $formattedPhone,
+            [
+                'from' => $twilioFrom,
+                'body' => "Your OTP is: $otp",
+            ]
+        );
+
+        \Log::info("OTP sent successfully to $formattedPhone");
+    } catch (\Exception $e) {
+        \Log::error("Failed to send OTP to $phone", ['error' => $e->getMessage()]);
+        throw new \Exception("Failed to send OTP. Please try again.");
+    }
+}*/
+
+    private function sendOtpToPhone($phone, $otp)
+    {
+        try {
+            // Format the phone number (e.g., for Ghana, prepend +233)
+            $formattedPhone = preg_replace('~^(?:0|\+?233)?~', '+233', $phone);
+    
+            // AWS SNS client configuration
+            $sns = new \Aws\Sns\SnsClient([
+                'credentials' => [
+                    'key' => env('AWS_ACCESS_KEY_ID'),
+                    'secret' => env('AWS_SECRET_ACCESS_KEY'),
+                ],
+                'region' => env('AWS_DEFAULT_REGION'),
+                'version' => 'latest',
+            ]);
+    
+            // Message payload
+            $args = [
+                'MessageAttributes' => [
+                    'AWS.SNS.SMS.SMSType' => [
+                        'DataType' => 'String',
+                        'StringValue' => 'Transactional',
+                    ],
+                ],
+                'Message' => "Your OTP is: $otp",
+                'PhoneNumber' => $formattedPhone,
+            ];
+    
+            // Send the SMS
+            $sns->publish($args);
+    
+            \Log::info("OTP sent successfully to $formattedPhone");
+        } catch (\Exception $e) {
+            \Log::error("Failed to send OTP to $phone", ['error' => $e->getMessage()]);
+            throw new \Exception("Failed to send OTP. Please try again.");
+        }
+    }
+
+     
+ // OTP Generation Function
+ public function generateOTP($userType)
+ {
+     // Map user types to their respective models
+     $modelMap = [
+         'SERVICE_PROVIDER' => \App\Models\ServiceProvider::class,
+         'FSA_AGENT' => \App\Models\FireServiceAgent::class,
+         'GRA_PERSONNEL' => \App\Models\GRA::class,
+     ];
+
+     $model = $modelMap[strtoupper($userType)] ?? null;
+
+     if (!$model) {
+         throw new \Exception("Invalid user type provided for OTP generation.");
+     }
+
+     do {
+         // Generate a random 6-digit OTP
+         $otp = random_int(100000, 999999);
+     } while ($model::where('OTP', $otp)->exists());
+
+     return $otp;
+ }
 
     /**
      * Sign in an existing user.
@@ -217,6 +380,18 @@ class AuthController extends Controller
         if (!$user->isActive) {
             \Log::warning('Inactive account login attempt', ['email' => $user->email, 'user_type' => $userType]);
             return response()->json(['message' => 'Account is inactive'], 403);
+        }
+
+        //Check if sms_verified is true for user
+        if ($user->sms_verified !== 1) {
+            \Log::warning('SMS verification required', ['email' => $user->email, 'user_type' => $userType]);
+            return response()->json(['message' => 'Please verify your phone number'], 403);
+        }
+
+        // Check if email_verified_at is null for user
+        if ($user->email_verified_at === null) {
+            \Log::warning('Email verification required', ['email' => $user->email, 'user_type' => $userType]);
+            return response()->json(['message' => 'Please verify your email address'], 403);
         }
 
         // Generate API token
@@ -567,13 +742,16 @@ class AuthController extends Controller
             }
 
             // Fetch the required statistics
-            $totalInvoices = Invoicing::count(); // Total number of invoices
+            $totalSPInvoices = Invoicing::count(); // Total number of invoices by Service Provider
+           $invoicebyFSA = InvoicesbyFSA::count(); // Total number of invoices by FSA
 
             // Return the statistics
             return response()->json([
                 'message' => 'Dashboard statistics retrieved successfully',
                 'data' => [
-                    'total_invoices' => $totalInvoices,
+                    'total_service_provider_invoices' => $totalSPInvoices,
+                    'total_FSA_invoices' => $invoicebyFSA
+
                 ],
             ], 200);
         } catch (\Exception $e) {

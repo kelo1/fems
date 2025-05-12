@@ -19,6 +19,7 @@ class ServiceProviderDevicesController extends Controller
     {
         $request->validate([
             'service_provider_id' => 'required|exists:service_providers,id',
+            'description' => 'nullable|string|max:1000', // Optional description field
         ]);
 
         // Generate a unique device serial number
@@ -28,6 +29,7 @@ class ServiceProviderDevicesController extends Controller
         $device = ServiceProviderDevice::create([
             'device_serial_number' => $deviceSerialNumber,
             'service_provider_id' => $request->service_provider_id,
+            'description' => $request->description, // Save the optional description
         ]);
 
         return response()->json([
@@ -53,11 +55,13 @@ class ServiceProviderDevicesController extends Controller
             // Validate the request
             $request->validate([
                 'service_provider_id' => 'required|exists:service_providers,id',
+                'description' => 'nullable|string|max:1000', // Optional description field
             ]);
 
             // Update the device
             $device->update([
                 'service_provider_id' => $request->service_provider_id,
+                'description' => $request->description, // Update the optional description
             ]);
 
             return response()->json([
@@ -65,21 +69,18 @@ class ServiceProviderDevicesController extends Controller
                 'data' => $device,
             ], 200);
         } catch (\Illuminate\Validation\ValidationException $e) {
-            // Log validation errors
             \Log::error('Validation error in update method', [
                 'errors' => $e->errors(),
                 'trace' => $e->getTraceAsString(),
             ]);
             return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            // Log model not found errors
             \Log::error('Device not found in update method', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
             return response()->json(['message' => 'Device not found', 'error' => $e->getMessage()], 404);
         } catch (\Exception $e) {
-            // Log general errors
             \Log::error('Error updating device', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),

@@ -9,7 +9,7 @@ class ServiceProviderDevice extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['device_serial_number', 'service_provider_id'];
+    protected $fillable = ['device_serial_number','description', 'service_provider_id'];
 
     public function serviceProvider()
     {

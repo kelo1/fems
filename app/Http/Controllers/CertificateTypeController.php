@@ -25,17 +25,17 @@ class CertificateTypeController extends Controller
          // Verify if the user is authenticated
          $user = Auth::user();
          if (!$user) {
-             return response()->json(['message' => 'Unauthorized'], 401);
+             return response()->json(['message' => 'Unauthenticated'], 401);
          }
  
          // Check if the user has the required role
-         if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
+         if (get_class($user) != "App\Models\FEMSAdmin") {
              return response()->json(['message' => 'Unauthorized'], 403);
          }
          
 
         try {
-            $certificateTypes = CertificateType::all();
+            $certificateTypes = CertificateType::with(['fems_admin'])->get();
             return response()->json(['message' => 'Certificate types retrieved successfully', 'data' => $certificateTypes], 200);
         } catch (\Exception $e) {
             \Log::error('Error in CertificateTypeController@index', [

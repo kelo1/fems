@@ -7,11 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\SoftDeletes;
-
+use Illuminate\Notifications\Notifiable;
 
 class ServiceProvider extends Authenticatable
 {
-    use HasApiTokens, HasFactory, SoftDeletes;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -22,6 +22,10 @@ class ServiceProvider extends Authenticatable
         'password',
         'license_id',
         'isActive',
+        'email_token',
+        'OTP',
+       'sms_verified',
+       'email_verified_at',
     ];
 
     protected $hidden = [

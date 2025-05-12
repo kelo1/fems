@@ -10,7 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use App\Notifications\ForgotClientPasswordNotification;
+use App\Notifications\ForgotPasswordNotification;
 
 class ForgotPasswordController extends Controller
 {
@@ -41,99 +41,120 @@ class ForgotPasswordController extends Controller
      * @return \Illuminate\Http\Response
      */
 
-    //
     public function submitForgetPasswordForm(Request $request)
-      {
+    {
+        // Validate the email field
+        $fields = $request->validate([
+            'email' => 'required|email',
+            'user_type' => 'required|string|in:SERVICE_PROVIDER,FSA_AGENT,GRA_PERSONNEL',
+        ]);
 
+        $email = $fields['email'];
+        $userType = strtoupper($fields['user_type']);
 
+        // Map user types to their respective models
+        $modelMap = [
+            'SERVICE_PROVIDER' => \App\Models\ServiceProvider::class,
+            'FSA_AGENT' => \App\Models\FireServiceAgent::class,
+            'GRA_PERSONNEL' => \App\Models\GRA::class,
+        ];
 
-        $email=$request->email;
+        $model = $modelMap[$userType] ?? null;
 
-        $client_id = Client::where('email',$email)->value('id');
+        if (!$model) {
+            return response()->json(['message' => 'Invalid user type provided'], 400);
+        }
 
+        // Retrieve the user by email
+        $user = $model::where('email', $email)->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        // Generate a unique token
         $token = Str::random(64);
 
-        $client_type = Client::where('id',$client_id)->value('client_type');
+        // Insert the token into the password_resets table
+        DB::table('password_resets')->insert([
+            'email' => $email,
+            'token' => $token,
+            'created_at' => Carbon::now(),
+        ]);
 
-        if($client_type=='INDIVIDUAL'){
-            $client_name = Individual_clients::where('client_id', $client_id)
-            ->value('first_name');
-        }
-        else{
-            $client_name = Corporate_clients::where('client_id', $client_id)
-            ->value('company_name');
-        }
+        // Determine the user's name
+        $userName = $user->name ?? 'User';
 
-            $fields =  $request->validate([
-            'email' => 'required|email|exists:clients',
-                ]);
+        // Send the password reset notification
+        $user->notify(new ForgotPasswordNotification($user, $userName, $email, $token));
 
-          DB::table('password_resets')->insert([
-              'email' => $request->email,
-              'token' => $token,
-              'created_at' => Carbon::now()
-            ]);
+        // Return a success response
+        return response()->json([
+            'token' => $token,
+            'message' => 'We have e-mailed your password reset link!',
+        ], 201);
+    }
 
-           //Send Email to view
-           $toAddress = Client::where('email',$fields['email'])->value('email');
-
-
-           $client = Client::findOrFail($client_id);
-        $client->notify(new ForgotClientPasswordNotification($client, $client_name, $toAddress, $token));
-
-
-          $response = [
-              'token'=>$token,
-            'message'=> 'We have e-mailed your password reset link!',
-
-         ];
-
-         return response($response, 201);
-      }
-
-       /**
+    /**
      * Reset Password
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
 
-      public function submitResetPasswordForm(Request $request)
-      {
-            //$request->client_id;
+    public function submitResetPasswordForm(Request $request)
+    {
+        // Validate the input fields
+        $fields = $request->validate([
+            'user_type' => 'required|string|in:SERVICE_PROVIDER,FSA_AGENT,GRA_PERSONNEL',
+            'id' => 'required|integer',
+            'token' => 'required|string',
+            'password' => 'required|string|confirmed',
+        ]);
 
-          $request->validate([
-             // 'email' => 'required|email|exists:clients',
-              'password' => 'required|string|confirmed'
-          ]);
+        $userType = strtoupper($fields['user_type']);
 
-          $updatePassword = DB::table('password_resets')
-                              ->where([
-                               // 'email' => $request->email,
-                                'token' => $request->token
-                              ])
-                              ->first();
-
-          if(!$updatePassword){
-              return back()->withInput()->with('error', 'Invalid token!');
-          }
-
-          $client = Client::where('id', $request->id)
-                      ->update(['password' => Hash::make($request->password),
-                                 'updated_at' => Carbon::now()]);
-
-          DB::table('password_resets')->where(['email'=> $request->email])->delete();
-
-
-        $response = [
-            'message'=> 'Password changed successfully!',
-
+        // Map user types to their respective models
+        $modelMap = [
+            'SERVICE_PROVIDER' => \App\Models\ServiceProvider::class,
+            'FSA_AGENT' => \App\Models\FireServiceAgent::class,
+            'GRA_PERSONNEL' => \App\Models\GRA::class,
         ];
 
-        return response($response, 200);
+        $model = $modelMap[$userType] ?? null;
 
-         // return redirect('customer/login')->with('message', 'Your password has been changed!');
-      }
+        if (!$model) {
+            return response()->json(['message' => 'Invalid user type provided'], 400);
+        }
 
+        // Check if the token exists in the password_resets table
+        $updatePassword = DB::table('password_resets')
+            ->where('token', $fields['token'])
+            ->first();
 
+        if (!$updatePassword) {
+            return response()->json(['message' => 'Invalid token!'], 400);
+        }
+
+        // Retrieve the user by ID
+        $user = $model::find($fields['id']);
+
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        // Update the user's password
+        $user->update([
+            'password' => Hash::make($fields['password']),
+            'updated_at' => Carbon::now(),
+        ]);
+
+        // Delete the token from the password_resets table
+        DB::table('password_resets')->where(['email' => $updatePassword->email])->delete();
+
+        // Return a success response
+        return response()->json([
+            'message' => 'Password changed successfully!',
+        ], 200);
+    }
 }

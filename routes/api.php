@@ -21,10 +21,12 @@ use App\Http\Controllers\CorporateTypeController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CustomerTypeController;
 use App\Http\Controllers\InvoicingController;
+use App\Http\Controllers\InvoicesbyFSAController;
 use App\Http\Controllers\EquipmentActivityController;
 use App\Http\Controllers\ServiceProviderDevicesController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\CertificateTypeController;
+
 
 
 /*
@@ -38,6 +40,22 @@ use App\Http\Controllers\CertificateTypeController;
 |
 */
 
+Route::get('/csrf-test', function () {
+  return response()->json(['message' => 'Hello without middleware!']);
+});
+
+Route::get('/test-session', function () {
+  return response()->json([
+      'session_id' => session()->getId(),
+      'session_data' => session()->all(),
+  ]);
+});
+
+
+Route::get('/sanctum/csrf-cookie', function (Request $request) {
+    return response()->json(['message' => 'CSRF cookie set']);
+});
+
 //Authentication Routes
 Route::post('/user/register', [AuthController::class, 'signUp']);
 Route::post('/user/login', [AuthController::class, 'signIn']);
@@ -49,14 +67,15 @@ Route::post('/fems_admin/login', [FEMSAdminController::class, 'login'])->name('l
 
 Route::post('client/login', [ClientController::class, 'login'])->name('login_client');
 
-Route::post('client/otp/validate', [ValidatePhoneNumber::class, 'validateOTP'])->name('validate_client_otp');
-Route::post('client/resend/otp', [ValidatePhoneNumber::class, 'resendOTP'])->name('resend_otp');
-Route::post('client/email/validate', [ValidateEmailController::class, 'validateEmail'])->name('validate_client_email');
-Route::post('client/fems/email/resend', [ValidateEmailController::class, 'resendemail'])->name('resend_email');
+// Validate User Phone Number and Email Routes
+Route::post('user/otp/validate', [ValidatePhoneNumber::class, 'validateOTP'])->name('validate_user_otp');
+Route::post('user/resend/otp', [ValidatePhoneNumber::class, 'resendOTP'])->name('resend_otp');
+Route::post('user/email/validate', [ValidateEmailController::class, 'validateEmail'])->name('validate_user_email');
+Route::post('user/email/resend', [ValidateEmailController::class, 'resendEmail'])->name('resend_email');
 
-//Password Reset - Client
-Route::post('client/password/forgotpassword', [ForgotPasswordController::class, 'submitForgetPasswordForm'])->name('client_forgot_password');
-Route::post('client/password/resetpassword', [ForgotPasswordController::class, 'submitResetPasswordForm'])->name('client_reset_password');
+//Password Reset - User
+Route::post('user/password/forgotpassword', [ForgotPasswordController::class, 'submitForgetPasswordForm'])->name('client_forgot_password');
+Route::post('user/password/resetpassword', [ForgotPasswordController::class, 'submitResetPasswordForm'])->name('client_reset_password');
 
 
 // User Type Routes
@@ -78,7 +97,7 @@ Route::post('/user/validate_phone', [AuthController::class, 'validatePhone'])->n
 //---------------------------------------------------------------------------------------------------------//
 
 //Protected routes which require authentication
-Route::group(['middleware'=>['auth:sanctum']], function(){
+Route::group(['middleware'=>['web','auth:sanctum']], function(){
 
   //Protected User Routes
   Route::post('/user/logout', [AuthController::class, 'logout'])->name('user_logout');
@@ -88,6 +107,8 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::put('/user/update_user/{id}', [AuthController::class, 'update'])->name('user_update');
   Route::delete('/user/delete_user/{id}', [AuthController::class, 'destroy'])->name('user_delete');
   Route::post('/user/show_by_user_type', [AuthController::class, 'showbyUserType'])->name('user_show');
+  Route::post('/user/user_by_id/{id}', [AuthController::class, 'getUserByID'])->name('user_by_id');
+
 
   //Protected User Dashboard Routes
   Route::get('/FEMSAdmin/dashboard', [AuthController::class, 'adminDashboard'])->name('user_dashboard');
@@ -157,7 +178,6 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::post('/equipment/updateClientOrServiceProvider/{equipment_id}', [EquipmentController::class, 'updateClientOrServiceProvider'])->name('updateClientOrServiceProvider');
   Route::get('/equipment/details/{id}', [EquipmentController::class, 'getEquipmentByID'])->name('equipment_details');
   Route::get('/equipment/serial_number/{serial_number}', [EquipmentController::class, 'getEquipmentBySerialNumber'])->name('equipment_by_serial_number');
-  Route::get('/equipment/status/{id}', [EquipmentController::class, 'checkEquipmentStatus']);
   Route::get('/equipment/history/{equipment_id}', [EquipmentController::class, 'getEquipmentHistory'])->name('equipment_history');
 
   //Protected QR Code Routes
@@ -176,6 +196,7 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
 
   //Protected Billing Routes
   Route::get('/billing/service_provider/{serviceProviderId}', [BillingController::class, 'billingByServiceProvider'])->name('billing_by_service_provider');
+  Route::get('/billing/fsa/{fsaID}', [BillingController::class, 'billingByFSA'])->name('billing_by_FSA');
   Route::post('/billing/create', [BillingController::class, 'store'])->name('setup_billing');
   Route::put('/billing/update/{id}', [BillingController::class, 'update'])->name('update_billing_items');
   Route::delete('/billing/delete', [BillingController::class, 'destroy'])->name('delete_billing_items');
@@ -183,6 +204,7 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::get('/billing/activebills', [BillingController::class, 'ActiveBillItems'])->name('active_billing');
   Route::get('/billing/search/{search}', [BillingController::class, 'search'])->name('search_billitems');
   Route::put('/billing/service_provider/vat_rate/{serviceProviderId}', [BillingController::class, 'updateVATRate']);
+  
   //Protected Invoicing Routes
   Route::post('/invoicing/all', [InvoicingController::class, 'index'])->name('invoice_all');
   Route::post('/invoicing/create', [InvoicingController::class, 'generateInvoice'])->name('create_invoicing');
@@ -193,6 +215,15 @@ Route::group(['middleware'=>['auth:sanctum']], function(){
   Route::put('/invoicing/update/{id}', [InvoicingController::class, 'update'])->name('update_invoicing');
   Route::delete('/invoicing/delete/{id}', [InvoicingController::class, 'destroy'])->name('delete_invoicing');
   Route::get('/invoices/edit/{id}', [InvoicingController::class, 'edit'])->name('edit_invoicing');
+
+  //Protected FSA Invoicing Routes
+  Route::post('/fsa/invoice/all', [InvoicesbyFSAController::class, 'index'])->name('fsa_invoices_all');
+  Route::post('/fsa/invoice/generate', [InvoicesbyFSAController::class, 'generateInvoice'])->name('fsa_generate_invoice');
+  Route::get('/fsa/invoice_by_fsa/{fsaId}', [InvoicesbyFSAController::class, 'getInvoiceByFSA'])->name('fsa_invoicing_by_FSA');
+  Route::get('/fsa/invoice/{id}', [InvoicesbyFSAController::class, 'show'])->name('fsa_invoice_show');
+  Route::put('/fsa/invoice/update/{id}', [InvoicesbyFSAController::class, 'update'])->name('update_fsa_invoice');
+  Route::delete('/fsa/invoice/{id}', [InvoicesbyFSAController::class, 'destroy'])->name('delete_fsa_invoice');
+  Route::get('/fsa/invoices/edit/{id}', [InvoicesbyFSAController::class, 'edit'])->name('edit_fsa_invoice');
 
   //Protected Equipment Activity Routes
   Route::get('/equipment_activity/all', [EquipmentActivityController::class, 'index'])->name('all_equipment_activities');

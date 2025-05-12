@@ -592,16 +592,16 @@ class ClientController extends Controller
             )->get();
     
             // Get the base URL from the environment variable
-            $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
+            $baseURL = env('AWS_URL', config('filesystems.disks.s3.url')); // Fallback to S3 URL if AWS_URL is not set
     
             // Add certificate and registration URLs to each corporate client
             $clientsWithUrls = $clients->map(function ($client) use ($baseURL) {
                 $client->certificate_url = $client->certificate_of_incorporation
-                    ? $baseURL . Storage::url('uploads/corporate_clients/' . $client->certificate_of_incorporation)
+                    ? $baseURL . '/uploads/corporate_clients/' . $client->certificate_of_incorporation
                     : null;
     
                 $client->registration_url = $client->company_registration
-                    ? $baseURL . Storage::url('uploads/corporate_clients/' . $client->company_registration)
+                    ? $baseURL . '/uploads/corporate_clients/' . $client->company_registration
                     : null;
     
                 return $client;
@@ -709,13 +709,13 @@ class ClientController extends Controller
                 'individual_clients.document'
             )->get();
 
-            // Get the base URL from the environment variable
-            $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
+            // Get the base URL from the AWS_URL environment variable
+            $baseURL = env('AWS_URL', config('filesystems.disks.s3.url')); // Fallback to S3 URL if AWS_URL is not set
 
             // Add document URL to each individual client
             $clientsWithDocumentUrl = $clients->map(function ($client) use ($baseURL) {
                 $client->document_url = $client->document
-                    ? $baseURL . Storage::url('uploads/individual_clients/' . $client->document)
+                    ? $baseURL . '/uploads/individual_clients/' . $client->document
                     : null;
                 return $client;
             });
@@ -749,6 +749,8 @@ class ClientController extends Controller
         // Determine client type
         $clientType = strtoupper($client->client_type);
 
+        $baseURL = env('AWS_URL', config('filesystems.disks.s3.url')); // Use AWS S3 URL
+
         if ($clientType === 'INDIVIDUAL') {
             // Fetch uploads for individual clients
             $individualClient = Individual_clients::where('client_id', $id)->first();
@@ -761,7 +763,7 @@ class ClientController extends Controller
                 'message' => 'Individual client uploads retrieved successfully',
                 'uploads' => [
                     'document_type' => $individualClient->document_type,
-                    'document' => $individualClient->document ? url('storage/uploads/individual_clients/' . $individualClient->document) : null,
+                    'document' => $individualClient->document ? $baseURL . '/uploads/individual_clients/' . $individualClient->document : null,
                 ],
             ], 200);
         } elseif ($clientType === 'CORPORATE') {
@@ -775,8 +777,8 @@ class ClientController extends Controller
             return response()->json([
                 'message' => 'Corporate client uploads retrieved successfully',
                 'uploads' => [
-                    'certificate_of_incorporation' => $corporateClient->certificate_of_incorporation ? url('storage/uploads/corporate_clients/' . $corporateClient->certificate_of_incorporation) : null,
-                    'company_registration' => $corporateClient->company_registration ? url('storage/uploads/corporate_clients/' . $corporateClient->company_registration) : null,
+                    'certificate_of_incorporation' => $corporateClient->certificate_of_incorporation ? $baseURL . '/uploads/corporate_clients/' . $corporateClient->certificate_of_incorporation : null,
+                    'company_registration' => $corporateClient->company_registration ? $baseURL . '/uploads/corporate_clients/' . $corporateClient->company_registration : null,
                 ],
             ], 200);
         } else {
@@ -786,85 +788,95 @@ class ClientController extends Controller
 
     public function deleteClientUpload(Request $request, $id)
     {
-        // Authenticate user
-        $user = Auth::user();
+        try {
+            // Authenticate user
+            $user = Auth::user();
 
-        if (!$user) {
-            return response(['message' => 'Unauthorized'], 403);
-        }
-
-        // Validate the request
-        $request->validate([
-            'upload_type' => 'required|string|in:document,certificate_of_incorporation,company_registration',
-        ]);
-
-        // Find the client
-        $client = Client::find($id);
-
-        if (!$client) {
-            return response()->json(['message' => 'Client not found'], 404);
-        }
-
-        // Determine client type
-        $clientType = strtoupper($client->client_type);
-        $uploadType = $request->upload_type;
-
-        if ($clientType === 'INDIVIDUAL') {
-            // Fetch individual client details
-            $individualClient = Individual_clients::where('client_id', $id)->first();
-
-            if (!$individualClient) {
-                return response()->json(['message' => 'Individual client details not found'], 404);
+            if (!$user) {
+                return response(['message' => 'Unauthorized'], 403);
             }
 
-            if ($uploadType === 'document') {
-                if ($individualClient->document) {
-                    // Delete the file from storage
-                    Storage::disk('public')->delete('uploads/individual_clients/' . $individualClient->document);
+            // Validate the request
+            $request->validate([
+                'upload_type' => 'required|string|in:document,certificate_of_incorporation,company_registration',
+            ]);
 
-                    // Update the database
-                    $individualClient->update(['document' => null]);
+            // Find the client
+            $client = Client::find($id);
 
-                    return response()->json(['message' => 'Document deleted successfully'], 200);
-                } else {
-                    return response()->json(['message' => 'No document found to delete'], 404);
+            if (!$client) {
+                return response()->json(['message' => 'Client not found'], 404);
+            }
+
+            // Determine client type
+            $clientType = strtoupper($client->client_type);
+            $uploadType = $request->upload_type;
+
+            if ($clientType === 'INDIVIDUAL') {
+                // Fetch individual client details
+                $individualClient = Individual_clients::where('client_id', $id)->first();
+
+                if (!$individualClient) {
+                    return response()->json(['message' => 'Individual client details not found'], 404);
                 }
-            }
-        } elseif ($clientType === 'CORPORATE') {
-            // Fetch corporate client details
-            $corporateClient = Corporate_clients::where('client_id', $id)->first();
 
-            if (!$corporateClient) {
-                return response()->json(['message' => 'Corporate client details not found'], 404);
-            }
+                if ($uploadType === 'document') {
+                    if ($individualClient->document) {
+                        // Delete the file from S3
+                        Storage::disk('s3')->delete('uploads/individual_clients/' . $individualClient->document);
 
-            if ($uploadType === 'certificate_of_incorporation') {
-                if ($corporateClient->certificate_of_incorporation) {
-                    // Delete the file from storage
-                    Storage::disk('public')->delete('uploads/corporate_clients/' . $corporateClient->certificate_of_incorporation);
+                        // Update the database
+                        $individualClient->update(['document' => null]);
 
-                    // Update the database
-                    $corporateClient->update(['certificate_of_incorporation' => null]);
-
-                    return response()->json(['message' => 'Certificate of incorporation deleted successfully'], 200);
-                } else {
-                    return response()->json(['message' => 'No certificate of incorporation found to delete'], 404);
+                        return response()->json(['message' => 'Document deleted successfully'], 200);
+                    } else {
+                        return response()->json(['message' => 'No document found to delete'], 404);
+                    }
                 }
-            } elseif ($uploadType === 'company_registration') {
-                if ($corporateClient->company_registration) {
-                    // Delete the file from storage
-                    Storage::disk('public')->delete('uploads/corporate_clients/' . $corporateClient->company_registration);
+            } elseif ($clientType === 'CORPORATE') {
+                // Fetch corporate client details
+                $corporateClient = Corporate_clients::where('client_id', $id)->first();
 
-                    // Update the database
-                    $corporateClient->update(['company_registration' => null]);
-
-                    return response()->json(['message' => 'Company registration deleted successfully'], 200);
-                } else {
-                    return response()->json(['message' => 'No company registration found to delete'], 404);
+                if (!$corporateClient) {
+                    return response()->json(['message' => 'Corporate client details not found'], 404);
                 }
+
+                if ($uploadType === 'certificate_of_incorporation') {
+                    if ($corporateClient->certificate_of_incorporation) {
+                        // Delete the file from S3
+                        Storage::disk('s3')->delete('uploads/corporate_clients/' . $corporateClient->certificate_of_incorporation);
+
+                        // Update the database
+                        $corporateClient->update(['certificate_of_incorporation' => null]);
+
+                        return response()->json(['message' => 'Certificate of incorporation deleted successfully'], 200);
+                    } else {
+                        return response()->json(['message' => 'No certificate of incorporation found to delete'], 404);
+                    }
+                } elseif ($uploadType === 'company_registration') {
+                    if ($corporateClient->company_registration) {
+                        // Delete the file from S3
+                        Storage::disk('s3')->delete('uploads/corporate_clients/' . $corporateClient->company_registration);
+
+                        // Update the database
+                        $corporateClient->update(['company_registration' => null]);
+
+                        return response()->json(['message' => 'Company registration deleted successfully'], 200);
+                    } else {
+                        return response()->json(['message' => 'No company registration found to delete'], 404);
+                    }
+                }
+            } else {
+                return response()->json(['message' => 'Invalid client type'], 400);
             }
-        } else {
-            return response()->json(['message' => 'Invalid client type'], 400);
+        } catch (\Exception $e) {
+            // Log the exception
+            \Log::error('Error in deleteClientUpload', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json(['message' => 'An error occurred while deleting the upload', 'error' => $e->getMessage()], 500);
         }
     }
 

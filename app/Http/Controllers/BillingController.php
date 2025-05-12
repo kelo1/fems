@@ -24,10 +24,25 @@ class BillingController extends Controller
 
     public function billingByServiceProvider($serviceProviderId)
     {
-        $billings = Billing::where('created_by', $serviceProviderId)->get();
+        $billings = Billing::where('created_by', $serviceProviderId)
+                            ->where('created_by_type', 'App\Models\ServiceProvider')
+                            ->get();
 
         if ($billings->isEmpty()) {
             return response()->json(['message' => 'No billings found for this service provider'], 404);
+        }
+
+        return response()->json(['message' => 'Billings retrieved successfully', 'data' => $billings], 200);
+    }
+
+    public function billingByFSA($fsaId)
+    {
+        $billings = Billing::where('created_by', $fsaId)
+                            ->where('created_by_type', 'App\Models\FireServiceAgent')
+                            ->get();
+
+        if ($billings->isEmpty()) {
+            return response()->json(['message' => 'No billings found for this FSA'], 404);
         }
 
         return response()->json(['message' => 'Billings retrieved successfully', 'data' => $billings], 200);

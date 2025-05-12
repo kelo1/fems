@@ -15,7 +15,7 @@ return new class extends Migration
     {
         Schema::create('equipment_activities', function (Blueprint $table) {
             $table->id();
-            $table->string('activity'); // Activity description
+            $table->string('activity')->nullable(); // Activity description
             $table->date('next_maintenance_date')->nullable(); // Next maintenance date
             $table->unsignedBigInteger('service_provider_id')->nullable(); // Service provider ID
             $table->unsignedBigInteger('client_id')->nullable(); // Client ID

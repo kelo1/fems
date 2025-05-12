@@ -31,15 +31,17 @@ class EquipmentActivityController extends Controller
             // Validate the request
             $request->validate([
                 'device_serial_number' => 'required|string|exists:service_provider_devices,device_serial_number',
-                'activity' => 'required|string',
+                'activity' => 'nullable|string',
                 'next_maintenance_date' => 'nullable|date',
                 'service_provider_id' => 'nullable|exists:service_providers,id',
                 'client_id' => 'nullable|exists:clients,id',
                 'equipment_id' => 'nullable|exists:equipment,id'
             ]);
 
-            // Check if the device_serial_number exists in ServiceProviderDevices
-            $deviceExists = ServiceProviderDevice::where('device_serial_number', $request->device_serial_number)->exists();
+            // Check if the device_serial_number exists in ServiceProviderDevices and it belongs to the service provider
+            $deviceExists = ServiceProviderDevice::where('device_serial_number', $request->device_serial_number)
+                ->where('service_provider_id', $user->id)
+                ->exists();
 
             if (!$deviceExists) {
                 return response()->json(['message' => 'The device could not be validated, please contact FEMS Admin'], 403);

@@ -1,10 +1,14 @@
 <?php
 
 namespace App\Http\Controllers;
-use App\Models\Client;
+use App\Models\ServiceProvider;
+use App\Models\FireServiceAgent;
+use App\Models\GRA;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\View;
+use Aws\Sns\SnsClient;
+use Aws\Exception\AwsException;
 
 
 class ValidatePhoneNumber extends Controller
@@ -19,11 +23,25 @@ class ValidatePhoneNumber extends Controller
         //
     }
 
-    public function generateOTP()
+    public function generateOTP($userType)
     {
+        // Map user types to their respective models
+        $modelMap = [
+            'SERVICE_PROVIDER' => \App\Models\ServiceProvider::class,
+            'FSA_AGENT' => \App\Models\FireServiceAgent::class,
+            'GRA_PERSONNEL' => \App\Models\GRA::class,
+        ];
+
+        $model = $modelMap[strtoupper($userType)] ?? null;
+
+        if (!$model) {
+            throw new \Exception("Invalid user type provided for OTP generation.");
+        }
+
         do {
+            // Generate a random 6-digit OTP
             $otp = random_int(100000, 999999);
-        } while (Client::where("otp", "=", $otp)->first());
+        } while ($model::where('OTP', $otp)->exists());
 
         return $otp;
     }
@@ -36,101 +54,145 @@ class ValidatePhoneNumber extends Controller
      */
     public function validateOTP(Request $request)
     {
-        //$client_id = $request->session()->get('id');
+        try {
+            // Validate the input fields
+            $fields = $request->validate([
+                'user_type' => 'required|string|in:SERVICE_PROVIDER,FSA_AGENT,GRA_PERSONNEL',
+                'id' => 'required|integer',
+                'OTP' => 'required|integer',
+            ]);
 
-        $client_id= $request->client_id;
+            // Determine the model and table based on the user type
+            $modelMap = [
+                'SERVICE_PROVIDER' => \App\Models\ServiceProvider::class,
+                'FSA_AGENT' => \App\Models\FireServiceAgent::class,
+                'GRA_PERSONNEL' => \App\Models\GRA::class,
+            ];
 
-        $fields = $request->validate([
-            'OTP'=>'required|integer'
-        ]);
+            $model = $modelMap[$fields['user_type']] ?? null;
 
-         $client = Client::where('OTP',$fields['OTP'])->first();
+            if (!$model) {
+                return response()->json(['message' => 'Invalid user type provided'], 400);
+            }
 
+            // Find the user by ID and OTP
+            $user = $model::where('id', $fields['id'])
+                ->where('OTP', $fields['OTP'])
+                ->first();
 
-        if(!$client){
-            return response([
-                'message'=>'Invalid OTP Entered!'
-            ], 401);
+            if (!$user) {
+                return response()->json(['message' => 'Invalid OTP or user not found'], 401);
+            }
 
+            // Update the `sms_verified` column to true
+            $user->update(['sms_verified' => true]);
+
+            return response()->json(['message' => 'OTP validated successfully. Kindly confirm your email.'], 200);
+        } catch (\Exception $e) {
+            // Log the exception
+            \Log::error('Error validating OTP', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // Return a generic error response
+            return response()->json(['message' => 'An error occurred while validating OTP. Please try again later.'], 500);
         }
-        else{
-            DB::table('clients')
-            ->where('id', $client_id)
-            ->update(['sms_verified' => 1, ]);
-
-            return response("Kindly Confirm Email", 200);
-            //return View('validate_email');
-        }
-
-
     }
 
 
     public function resendOTP(Request $request)
     {
-        //$client_id= $request->id;
+        try {
+            // Validate the input fields
+            $fields = $request->validate([
+                'user_type' => 'required|string|in:SERVICE_PROVIDER,FSA_AGENT,GRA_PERSONNEL',
+                'phone' => 'required|string',
+            ]);
 
-        $fields = $request->validate([ 'phone'=>'required|string'  ]);
+            // Determine the model and table based on the user type
+            $modelMap = [
+                'SERVICE_PROVIDER' => \App\Models\ServiceProvider::class,
+                'FSA_AGENT' => \App\Models\FireServiceAgent::class,
+                'GRA_PERSONNEL' => \App\Models\GRA::class,
+            ];
 
-        $client_phone = Client::where('phone',$fields['phone'])->value('phone');
+            $model = $modelMap[$fields['user_type']] ?? null;
 
-        //Send OTP to client phone number
+            if (!$model) {
+                return response()->json(['message' => 'Invalid user type provided'], 400);
+            }
 
-$new_client_phone = $client_phone;
+            // Find the user by phone number
+            $user = $model::where('phone', $fields['phone'])->first();
 
-//new_client_phone = ltrim($new_client_phone, "0");
+            if (!$user) {
+                return response()->json(['message' => 'User not found'], 404);
+            }
 
-//prepend country code
-if($request->country=='Ghana'||$request->country=='GHANA'||$request->country=='ghana'){
-    $new_client_phone = preg_replace('~^(?:0|\+?233)?~', '+233', $client_phone);
-}
+            // Generate a new OTP
+            $otp = $this->generateOTP($fields['user_type']);
+          
+            // Format the phone number (e.g., for Ghana, prepend +233)
+           /* $formattedPhone = preg_replace('~^(?:0|\+?233)?~', '+233', $fields['phone']);
 
-if($request->country=='UK'||$request->country=='Uk'||$request->country=='uk'){
-$new_client_phone = preg_replace('~^(?:0|\+?44)?~', '+44', $client_phone);
+            // Twilio client configuration
+            $twilioSid = env('TWILIO_SID');
+            $twilioToken = env('TWILIO_AUTH_TOKEN');
+            $twilioFrom = env('TWILIO_PHONE_NUMBER'); // Ensure this is a valid Twilio number
 
-}
+            $twilio = new \Twilio\Rest\Client($twilioSid, $twilioToken);
 
-    $otp = $this->generateOTP();
-
-
-    $params = array(
-        'credentials' => [
-            'key'    => env('AWS_ACCESS_KEY_ID'),
-            'secret' => env('AWS_SECRET_ACCESS_KEY'),
-        ],
-        'region' => env('AWS_DEFAULT_REGION'),
-        'version' => 'latest'
-    );
-    $sns = new \Aws\Sns\SnsClient($params);
-
-    $args = array(
-            "MessageAttributes" =>[
-
-            /*
-                'AWS.SNS.SMS.SenderID'=>[
-                'DataType' => 'String',
-                'StringValue' =>'Transactional'
+            // Send the OTP via SMS
+            $twilio->messages->create(
+                $formattedPhone,
+                [
+                    'from' => $twilioFrom,
+                    'body' => "This is your OTP: $otp",
                 ]
-            */
+            );*/
+            $formattedPhone = preg_replace('~^(?:0|\+?233)?~', '+233', $phone);
+    
+            // AWS SNS client configuration
+            $sns = new \Aws\Sns\SnsClient([
+                'credentials' => [
+                    'key' => env('AWS_ACCESS_KEY_ID'),
+                    'secret' => env('AWS_SECRET_ACCESS_KEY'),
+                ],
+                'region' => env('AWS_DEFAULT_REGION'),
+                'version' => 'latest',
+            ]);
+    
+            // Message payload
+            $args = [
+                'MessageAttributes' => [
+                    'AWS.SNS.SMS.SMSType' => [
+                        'DataType' => 'String',
+                        'StringValue' => 'Transactional',
+                    ],
+                ],
+                'Message' => "Your OTP is: $otp",
+                'PhoneNumber' => $formattedPhone,
+            ];
+    
+            // Send the SMS
+            $sns->publish($args);
+   
 
-            'AWS.SNS.SMS.SMSType'=>[
-                'DataType' => 'String',
-                'StringValue' =>'Transactional'
-                ]
+            // Update the OTP in the database
+            $user->update(['OTP' => $otp]);
 
-            ],
-        "Message" => "This is your OTP: ".$otp,
-        "PhoneNumber" => $new_client_phone
-    );
+            return response()->json(['message' => 'OTP resent successfully. Kindly confirm OTP.'], 200);
+        } catch (\Exception $e) {
+            // Log the exception
+            \Log::error('Failed to resend OTP', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
 
-    $result = $sns->publish($args);
-    DB::table('clients')
-    ->where('phone', $new_client_phone)
-    ->update(['OTP' => $otp, ]);
-
-    return response("Kindly Confirm OTP", 200);
-    //return View('validate_number');
-
+            // Return a generic error response
+            return response()->json(['message' => 'Failed to resend OTP. Please try again later.'], 500);
+        }
     }
 
 

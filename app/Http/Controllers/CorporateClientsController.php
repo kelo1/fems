@@ -71,25 +71,24 @@ class CorporateClientsController extends Controller
         }
 
         try {
-          
             $corporateClients = Corporate_clients::with('client', 'corporateType')
-            ->whereHas('client', function ($query) use ($user) {
-                $query->where('created_by', $user->id) // Filter by created_by in the clients table
-                      ->where('created_by_type', get_class($user)); 
-            })
-            ->get();
+                ->whereHas('client', function ($query) use ($user) {
+                    $query->where('created_by', $user->id) // Filter by created_by in the clients table
+                          ->where('created_by_type', get_class($user));
+                })
+                ->get();
 
             // Get the base URL from the environment variable
-            $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
+            $baseURL = env('AWS_URL', config('filesystems.disks.s3.url')); // Fallback to S3 URL if AWS_URL is not set
 
             // Add certificate and registration URLs to each corporate client
             $corporateClientsWithUrls = $corporateClients->map(function ($corporateClient) use ($baseURL) {
                 $corporateClient->certificate_url = $corporateClient->certificate_of_incorporation
-                    ? $baseURL . Storage::url('uploads/corporate_clients/' . $corporateClient->certificate_of_incorporation)
+                    ? $baseURL . '/uploads/corporate_clients/' . $corporateClient->certificate_of_incorporation
                     : null;
 
                 $corporateClient->registration_url = $corporateClient->company_registration
-                    ? $baseURL . Storage::url('uploads/corporate_clients/' . $corporateClient->company_registration)
+                    ? $baseURL . '/uploads/corporate_clients/' . $corporateClient->company_registration
                     : null;
 
                 return $corporateClient;
@@ -99,8 +98,6 @@ class CorporateClientsController extends Controller
                 'message' => 'Corporate clients retrieved successfully',
                 'data' => $corporateClientsWithUrls,
             ], 200);
-
-        
         } catch (\Exception $e) {
             Log::error('Failed to retrieve corporate clients', ['error' => $e->getMessage()]);
             return response()->json(['message' => 'Failed to retrieve corporate clients'], 500);
@@ -118,15 +115,15 @@ class CorporateClientsController extends Controller
             }
 
             // Get the base URL from the environment variable
-            $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
+            $baseURL = env('AWS_URL', config('filesystems.disks.s3.url')); // Fallback to S3 URL if AWS_URL is not set
 
             // Add certificate and registration URLs to the corporate client
             $corporateClient->certificate_url = $corporateClient->certificate_of_incorporation
-                ? $baseURL . Storage::url('uploads/corporate_clients/' . $corporateClient->certificate_of_incorporation)
+                ? $baseURL . '/uploads/corporate_clients/' . $corporateClient->certificate_of_incorporation
                 : null;
 
             $corporateClient->registration_url = $corporateClient->company_registration
-                ? $baseURL . Storage::url('uploads/corporate_clients/' . $corporateClient->company_registration)
+                ? $baseURL . '/uploads/corporate_clients/' . $corporateClient->company_registration
                 : null;
 
             return response()->json([
@@ -189,15 +186,6 @@ class CorporateClientsController extends Controller
                 'created_by_type' => get_class($user), // Store the type of user who created the client
             ]);
 
-            // Log the creation of the client
-            Log::info('Client details stored', ['client_id' => $client->id]);
-
-            // Check if client_type is corporate
-            if ($request->client_type !== 'CORPORATE') {
-                \DB::rollBack();
-                return response()->json(['message' => 'Client type must be corporate'], 422);
-            }
-
             // Handle file uploads
             $certificateFileName = null;
             $registrationFileName = null;
@@ -207,15 +195,15 @@ class CorporateClientsController extends Controller
             if ($request->hasFile('certificate_of_incorporation')) {
                 $certificateFile = $request->file('certificate_of_incorporation');
                 $certificateFileName = 'certificate_' . $client->id . '_' . Str::slug($request->company_name) . '_' . now()->format('YmdHis') . '.' . $certificateFile->getClientOriginalExtension();
-                $certificateFile->storeAs('uploads/corporate_clients', $certificateFileName, 'public');
-                $certificateUrl = Storage::url('uploads/corporate_clients/' . $certificateFileName);
+                $certificateFile->storeAs('uploads/corporate_clients', $certificateFileName, 's3');
+                $certificateUrl = env('AWS_URL') . '/uploads/corporate_clients/' . $certificateFileName;
             }
 
             if ($request->hasFile('company_registration')) {
                 $registrationFile = $request->file('company_registration');
                 $registrationFileName = 'registration_' . $client->id . '_' . Str::slug($request->company_name) . '_' . now()->format('YmdHis') . '.' . $registrationFile->getClientOriginalExtension();
-                $registrationFile->storeAs('uploads/corporate_clients', $registrationFileName, 'public');
-                $registrationUrl = Storage::url('uploads/corporate_clients/' . $registrationFileName);
+                $registrationFile->storeAs('uploads/corporate_clients', $registrationFileName, 's3');
+                $registrationUrl = env('AWS_URL') . '/uploads/corporate_clients/' . $registrationFileName;
             }
 
             // Store corporate client details
@@ -232,8 +220,6 @@ class CorporateClientsController extends Controller
                 'client_id' => $client->id,
             ]);
 
-            Log::info('Corporate client details stored', ['client_id' => $client->id]);
-
             \DB::commit();
 
             return response()->json([
@@ -241,7 +227,6 @@ class CorporateClientsController extends Controller
                 'client' => $client,
                 'certificate_url' => $certificateUrl,
                 'registration_url' => $registrationUrl,
-                
             ], 201);
         } catch (\Exception $e) {
             \DB::rollBack();

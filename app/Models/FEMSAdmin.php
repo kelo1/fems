@@ -25,4 +25,13 @@ class FEMSAdmin extends Authenticatable
     protected $hidden = [
         'password',
     ];
+
+    public function createdBy()
+    {
+        return $this->hasMany(CertificateType::class, 'created_by');
+    }
+    public function createdByType()
+    {
+        return $this->hasMany(CertificateType::class, 'created_by_type');
+    }
 }

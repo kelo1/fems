@@ -2,15 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Invoicing;
+use App\Models\InvoicesbyFSA;
 use Illuminate\Http\Request;
-use App\Models\Equipment;
 use App\Models\Billing;
-use App\Models\ServiceProvider;
-use App\Models\ServiceProviderVAT;
+use App\Models\Invoicing;
 use App\Models\Client;
 use App\Models\Corporate_clients;
 use App\Models\Individual_clients;
+use App\Models\FireServiceAgent;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use LaravelDaily\Invoices\Invoice;
@@ -21,7 +20,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 
-class InvoicingController extends Controller
+class InvoicesbyFSAController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -41,7 +40,7 @@ class InvoicingController extends Controller
 
             if ($user_type == 'FEMS_ADMIN' || $user_type == 'GRA_PERSONNEL') {
                 // Retrieve all invoices with associated client and service provider details
-                $invoicings = Invoicing::with(['client', 'serviceProvider'])->get();
+                $invoicings = InvoicesbyFSA::with(['client', 'fireServiceAgent'])->get();
 
                 // Add client details dynamically based on client_type
                 foreach ($invoicings as $invoice) {
@@ -70,24 +69,7 @@ class InvoicingController extends Controller
         }
     }
 
-    public function generateRandomSequence()
-    {
-        do {
-            $random_sequence = random_int(100000, 999999);
-        } while (
-            InvoicesbyFSA::where("invoice_number", "=", $random_sequence)->first() || 
-            Invoicing::where("invoice_number", "=", $random_sequence)->first()
-        );
-        
-        return $random_sequence;
-    }
 
-
-    /**
-     * Show the form for creating a new resource.
-     *@param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
     public function generateInvoice(Request $request)
     {
         try {
@@ -98,15 +80,20 @@ class InvoicingController extends Controller
                 \Log::error('Unauthorized access attempt');
                 return response(['message' => 'Unauthorized'], 403);
             }
+            
+            // Check if the user is a Fire Service Agent
+            $user = FireServiceAgent::find($user->id);
+            if (!$user) {
+                \Log::error('User not found', ['user_id' => $user->id]);
+                return response(['message' => 'User not found'], 404);
+            }
 
             $client_id = $request->client_id;
-            $serial_number = $request->serial_number;
             $Invoice_items = $request->InvoiceItems;
 
-            if (!$client_id || !$serial_number || !$Invoice_items) {
+            if (!$client_id  || !$Invoice_items) {
                 \Log::error('Missing required parameters', [
                     'client_id' => $client_id,
-                    'serial_number' => $serial_number,
                     'InvoiceItems' => $Invoice_items,
                 ]);
                 return response(['message' => 'Missing required parameters'], 400);
@@ -115,20 +102,12 @@ class InvoicingController extends Controller
             // Validate the request data
             $request->validate([
                 'client_id' => 'required|integer',
-                'serial_number' => 'required|string',
                 'InvoiceItems' => 'required|array', // Updated to expect an array
             ]);
 
             \Log::info('Request validated successfully');
 
-            // Check if the equipment exists
-            $equipment = Equipment::where('serial_number', $serial_number)->first();
-            if (!$equipment) {
-                \Log::error('Equipment not found for serial number', ['serial_number' => $serial_number]);
-                return response(['message' => 'Equipment not found'], 404);
-            }
-            \Log::info('Equipment found', ['equipment' => $equipment]);
-
+           
             // Get client type
             $client_type = Client::where('id', $client_id)->value('client_type');
             if (!$client_type) {
@@ -137,25 +116,7 @@ class InvoicingController extends Controller
             }
             \Log::info('Client type retrieved', ['client_type' => $client_type]);
 
-            // Get service provider ID
-            $service_provider_id = DB::table('equipment_service_providers')
-                ->where('serial_number', $serial_number)
-                ->where('status_service_provider', 1)
-                ->value('service_provider_id');
-            if (!$service_provider_id) {
-                \Log::error('Service provider not found for serial number', ['serial_number' => $serial_number]);
-                return response(['message' => 'Service provider not found'], 404);
-            }
-            \Log::info('Service provider ID retrieved', ['service_provider_id' => $service_provider_id]);
-
-            // Find the service provider
-            $service_provider = ServiceProvider::find($service_provider_id);
-            if (!$service_provider) {
-                \Log::error('Service provider not found', ['service_provider_id' => $service_provider_id]);
-                return response(['message' => 'Service provider not found'], 404);
-            }
-            \Log::info('Service provider found', ['service_provider' => $service_provider]);
-
+            
             // Get client details
             $client = null;
             if ($client_type == 'CORPORATE') {
@@ -184,11 +145,11 @@ class InvoicingController extends Controller
 
             // Create seller and buyer parties
             $seller = new Party([
-                'name' => $service_provider->name,
-                'phone' => $service_provider->phone,
+                'name' => $user->name,
+                'phone' => $user->phone,
                 'custom_fields' => [
-                    'email' => $service_provider->email,
-                    'address' => $service_provider->address,
+                    'email' => $user->email,
+                    'address' => $user->address,
                 ],
             ]);
             \Log::info('Seller party created', ['seller' => $seller]);
@@ -199,7 +160,6 @@ class InvoicingController extends Controller
                 'custom_fields' => [
                     'email' => $client_email,
                     'address' => $client_address,
-                    'Equipment serial number' => $equipment->serial_number,
                 ],
             ]);
             \Log::info('Buyer party created', ['buyer' => $buyer]);
@@ -239,7 +199,7 @@ class InvoicingController extends Controller
                     'withholding_applicable' => $isWithholdingApplicable,
                     'vat_rate' => $vatRate,
                     'withholding_rate' => $withholdingRate,
-                    'service_provider_id' => $service_provider_id,
+                    'fsa_id' => $user->id,
                 ]);
             
                 // Prices and quantities from decoded invoice input
@@ -279,12 +239,11 @@ class InvoicingController extends Controller
             // Deduct total withholding tax from the total amount
             $totalAmount -= $totalWithholdingTax;
 
-            
-
+            $invoice_number = $this->generateRandomSequence();
             // Generate the invoice
             $invoice = Invoice::make()
                 ->series('PP')
-                ->sequence($this->generateRandomSequence())
+                ->sequence($invoice_number)
                 ->serialNumberFormat('{SERIES}{SEQUENCE}')
                 ->seller($seller)
                 ->buyer($buyer)
@@ -296,19 +255,19 @@ class InvoicingController extends Controller
                 ->currencyFormat('{SYMBOL}{VALUE}')
                 ->currencyThousandsSeparator(',')
                 ->currencyDecimalPoint('.')
-                ->filename(Str::slug($client_name, '_') . '_' . $serial_number . '_invoice')
+                ->filename(Str::slug($client_name, '_') . '_' . 'PP' . $invoice_number . '_invoice')
                 ->addItems($items)
                 ->notes("Withholding tax (not deducted from payable amount): GH₵" . number_format($totalWithholdingTax, 2))
                 ->logo(public_path('storage/fems/logo.jpg'))
+                ->template('custom')
                 ->save('invoices');
 
             \Log::info('Invoice generated', ['filename' => $invoice->filename]);
 
             // Save invoice details to the database
-            DB::table('invoicings')->insert([
-                'service_provider_id' => $service_provider_id,
+            DB::table('invoices_by_fsa')->insert([
+                'fsa_id' => $user->id,
                 'invoice_number' => $invoice->getSerialNumber(),
-                'equipment_serial_number' => $serial_number,
                 'client_id' => $client_id,
                 'invoice_details' => json_encode($Invoice_items), // Save as JSON string
                 'invoice' => $invoice->filename,
@@ -338,20 +297,35 @@ class InvoicingController extends Controller
         }
     }
 
+
+    public function generateRandomSequence()
+    {
+        do {
+            $random_sequence = random_int(100000, 999999);
+        } while (
+            InvoicesbyFSA::where("invoice_number", "=", $random_sequence)->first() || 
+            Invoicing::where("invoice_number", "=", $random_sequence)->first()
+        );
+
+        return $random_sequence;
+    }
+
+   
     public function show($id)
-{
+    {
     try {
         // Retrieve the invoice by ID
-        $invoice = Invoicing::find($id);
+        $invoice = InvoicesbyFSA::find($id);
 
         if (!$invoice) {
             return response()->json(['message' => 'Invoice not found'], 404);
         }
 
+       
         $invoice->url = Storage::disk('s3')->url('invoices/'. $invoice->invoice);
+
         return response()->json(['message' => 'Invoice retrieved successfully', 
         "invoice_number" => $invoice->invoice_number,
-        "equipment_serial_number" => $invoice->equipment_serial_number,
         "invoice_url"=>$invoice->url], 200);
     } catch (\Exception $e) {
         // Log the error
@@ -361,21 +335,15 @@ class InvoicingController extends Controller
         ]);
 
         return response()->json(['message' => 'An error occurred while retrieving the invoice'], 500);
+        }
     }
-}
 
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  \App\Models\Invoicing  $invoicing
-     * @return \Illuminate\Http\Response
-     */
-  
+
     public function edit($id)
     {
         try {
             // Find the invoice by ID
-            $invoice = Invoicing::find($id);
+            $invoice = InvoicesbyFSA::find($id);
 
             if (!$invoice) {
                 \Log::error('Invoice not found', ['id' => $id]);
@@ -394,18 +362,57 @@ class InvoicingController extends Controller
         }
     }
 
+
+            
+public function getInvoiceByFSA($fsaId)
+{
+    try {
+        // Retrieve invoices for the given FSA ID
+        $invoices = InvoicesbyFSA::where('fsa_id', $fsaId)
+            ->with('client') // Eager load the client relationship
+            ->get();
+
+        if ($invoices->isEmpty()) {
+            \Log::info('No invoices found for the FSA', ['fsa_id' => $fsaId]);
+            return response(['message' => 'No invoices found for the FSA'], 404);
+        }
+
+        // Add client details dynamically based on client_type
+        foreach ($invoices as $invoice) {
+            $client = Client::find($invoice->client_id);
+
+            if ($client->client_type == 'CORPORATE') {
+                $invoice->client_details = Corporate_clients::where('client_id', $client->id)->first();
+            } else {
+                $invoice->client_details = Individual_clients::where('client_id', $client->id)->first();
+            }
+        }
+
+        \Log::info('Invoices retrieved for FSA', ['fsa_id' => $fsaId, 'invoices' => $invoices]);
+
+        return response(['invoices' => $invoices], 200);
+    } catch (\Exception $e) {
+        \Log::error('Exception occurred in getInvoiceByFSA', [
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        return response(['message' => 'An error occurred while retrieving invoices'], 500);
+    }
+}
+
+
     /**
      * Update the specified resource in storage.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Invoicing  $invoicing
+     * @param  \App\Models\InvoicesbyFSA  $invoicesbyFSA
      * @return \Illuminate\Http\Response
      */
     public function update(Request $request, $id)
     {
         try {
             // Find the invoice by ID
-            $invoice = Invoicing::find($id);
+            $invoice = InvoicesbyFSA::find($id);
 
             if (!$invoice) {
                 \Log::error('Invoice not found', ['id' => $id]);
@@ -437,23 +444,17 @@ class InvoicingController extends Controller
         }
     }
 
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  \App\Models\Invoicing  $invoicing
-     * @return \Illuminate\Http\Response
-     */
     public function destroy($id)
     {
         try {
             // Find the invoice by ID
-            $invoice = Invoicing::find($id);
-    
+            $invoice = InvoicesbyFSA::find($id);
+
             if (!$invoice) {
                 \Log::error('Invoice not found', ['id' => $id]);
                 return response(['message' => 'Invoice not found'], 404);
             }
-    
+            
             // Delete the invoice file from the S3 bucket if it exists
             $s3FilePath = 'invoices/' . $invoice->invoice;
             if (Storage::disk('s3')->exists($s3FilePath)) {
@@ -475,80 +476,6 @@ class InvoicingController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
             return response(['message' => 'An error occurred while deleting the invoice'], 500);
-        }
-    }
-
-
-    public function getInvoiceByServiceProvider($serviceProviderId)
-    {
-        try {
-            // Retrieve invoices for the given service provider ID
-            $invoices = Invoicing::where('service_provider_id', $serviceProviderId)
-                ->with('client') // Eager load the client relationship
-                ->get();
-
-            if ($invoices->isEmpty()) {
-                \Log::info('No invoices found for the service provider', ['service_provider_id' => $serviceProviderId]);
-                return response(['message' => 'No invoices found for the service provider'], 404);
-            }
-
-            // Add client details dynamically based on client_type
-            foreach ($invoices as $invoice) {
-                $client = Client::find($invoice->client_id);
-
-                if ($client->client_type == 'CORPORATE') {
-                    $invoice->client_details = Corporate_clients::where('client_id', $client->id)->first();
-                } else {
-                    $invoice->client_details = Individual_clients::where('client_id', $client->id)->first();
-                }
-            }
-
-            \Log::info('Invoices retrieved for service provider', ['service_provider_id' => $serviceProviderId, 'invoices' => $invoices]);
-
-            return response(['invoices' => $invoices], 200);
-        } catch (\Exception $e) {
-            \Log::error('Exception occurred in getInvoiceByServiceProvider', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            return response(['message' => 'An error occurred while retrieving invoices'], 500);
-        }
-    }
-
-
-    public function getInvoiceByClient($clientId)
-    {
-        try {
-            // Retrieve invoices for the given client ID
-            $invoices = Invoicing::where('client_id', $clientId)
-                ->with('serviceProvider') // Eager load the service provider relationship
-                ->get();
-
-            if ($invoices->isEmpty()) {
-                \Log::info('No invoices found for the client', ['client_id' => $clientId]);
-                return response(['message' => 'No invoices found for the client'], 404);
-            }
-
-            // Add client details dynamically based on client_type
-            foreach ($invoices as $invoice) {
-                $client = Client::find($invoice->client_id);
-
-                if ($client->client_type == 'CORPORATE') {
-                    $invoice->client_details = Corporate_clients::where('client_id', $client->id)->first();
-                } else {
-                    $invoice->client_details = Individual_clients::where('client_id', $client->id)->first();
-                }
-            }
-
-            \Log::info('Invoices retrieved for client', ['client_id' => $clientId, 'invoices' => $invoices]);
-
-            return response(['invoices' => $invoices], 200);
-        } catch (\Exception $e) {
-            \Log::error('Exception occurred in getInvoiceByClient', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            return response(['message' => 'An error occurred while retrieving invoices'], 500);
         }
     }
 }

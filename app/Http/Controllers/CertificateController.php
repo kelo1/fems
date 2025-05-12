@@ -67,26 +67,23 @@ class CertificateController extends Controller
         try {
             // Validate the request
             $request->validate([
-                'certificate_id' => 'required|exists:certificate_types,id', // Certificate type must exist
-                'client_id' => 'required|exists:clients,id', // Client must exist
-                'fsa_id' => 'required|exists:fire_service_agents,id', // FSA is required
-                'issued_date' => 'required|date', // Issued date is required
-                'expiry_date' => 'required|date|after:issued_date', // Expiry date must be after issued date
-                'certificate_upload' => 'required|file|mimes:pdf,jpg,jpeg,png|max:2048', // File upload validation
+                'certificate_id' => 'required|exists:certificate_types,id',
+                'client_id' => 'required|exists:clients,id',
+                'fsa_id' => 'required|exists:fire_service_agents,id',
+                'issued_date' => 'required|date',
+                'expiry_date' => 'required|date|after:issued_date',
+                'certificate_upload' => 'required|file|mimes:pdf,jpg,jpeg,png|max:2048',
             ]);
 
             // Handle the file upload
             if ($request->hasFile('certificate_upload')) {
                 $file = $request->file('certificate_upload');
 
-                // Fetch the certificate type name from the CertificateType model
-                $certificateType = CertificateType::find($request->certificate_id);
-                if (!$certificateType) {
-                    return response()->json(['message' => 'Invalid certificate type'], 400);
-                }
-
+                // Fetch the certificate type name
                 $certificateTypeName = CertificateType::where('id', $request->certificate_id)->value('certificate_name');
                 $clientType = Client::where('id', $request->client_id)->value('client_type');
+
+                // Determine the client name
                 if ($clientType === 'INDIVIDUAL') {
                     $clientName = \DB::table('individual_clients')->where('client_id', $request->client_id)->value('first_name');
                 } elseif ($clientType === 'CORPORATE') {
@@ -94,17 +91,21 @@ class CertificateController extends Controller
                 } else {
                     $clientName = 'unknown_client';
                 }
+
+                // Generate the file name
                 $fileName = $certificateTypeName . '_' . $clientName . '_' . $request->client_id . '_' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
-                $filePath = $file->storeAs('certificates', $fileName, 'public'); // Store in the 'public' disk
-                $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
+
+                // Store the file in S3
+                $filePath = $file->storeAs('certificates', $fileName, 's3');
 
                 // Generate the full URL for the uploaded file
-                $documentUrl = $baseURL. Storage::url($filePath);
+                $baseURL = env('AWS_URL', config('filesystems.disks.s3.url'));
+                $documentUrl = $baseURL . '/certificates/' . $fileName;
             } else {
                 return response()->json(['message' => 'Certificate upload is required'], 400);
             }
 
-            // check if certificate_id already exists for the client
+            // Check if certificate_id already exists for the client
             $existingCertificate = Certificate::where('client_id', $request->client_id)
                 ->where('certificate_id', $request->certificate_id)
                 ->first();
@@ -121,22 +122,19 @@ class CertificateController extends Controller
                 'expiry_date' => $request->expiry_date,
                 'created_by' => $user->id,
                 'created_by_type' => get_class($user),
-                'certificate_upload' => $documentUrl, // Store the file path in the database
+                'certificate_upload' => $documentUrl,
             ]);
 
-            
             return response()->json([
                 'message' => 'Certificate created successfully',
                 'data' => $certificate,
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
-            // Handle validation errors
             \Log::error('Validation error in CertificatesController@store', [
                 'errors' => $e->errors(),
             ]);
             return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
-            // Handle general errors
             \Log::error('Error in CertificatesController@store', [
                 'error' => $e->getMessage(),
             ]);
@@ -146,19 +144,6 @@ class CertificateController extends Controller
 
     public function update(Request $request, $id)
     {
-
-         // Verify if the user is authenticated
-         $user = Auth::user();
-         if (!$user) {
-             return response()->json(['message' => 'Unauthorized'], 401);
-         }
- 
-         // Check if the user has the required role
-         if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
-             return response()->json(['message' => 'Unauthorized'], 403);
-         }
-         
-
         // Verify if the user is authenticated
         $user = Auth::user();
         if (!$user) {
@@ -181,8 +166,6 @@ class CertificateController extends Controller
                 'fsa_id' => 'nullable|exists:fire_service_agents,id',
                 'issued_date' => 'sometimes|date',
                 'expiry_date' => 'sometimes|date|after:issued_date',
-                'created_by' => 'sometimes|integer',
-                'created_by_type' => 'sometimes|string',
                 'certificate_upload' => 'sometimes|file|mimes:pdf,jpg,jpeg,png|max:2048', // File upload validation
             ]);
 
@@ -203,12 +186,21 @@ class CertificateController extends Controller
                     $clientName = 'unknown_client';
                 }
 
-                // Generate the file name and store the file
+                // Generate the file name
                 $fileName = $certificateTypeName . '_' . $clientName . '_' . ($request->client_id ?? $certificate->client_id) . '_' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
-                $filePath = $file->storeAs('certificates', $fileName, 'public'); // Store in the 'public' disk
-                $baseURL = env('APP_BASE_URL', config('app.url')); // Fallback to app.url if APP_BASE_URL is not set
+
+                // Store the file in S3
+                $filePath = $file->storeAs('certificates', $fileName, 's3');
+
                 // Generate the full URL for the uploaded file
-                $documentUrl = $baseURL. Storage::url($filePath);
+                $baseURL = env('AWS_URL', config('filesystems.disks.s3.url'));
+                $documentUrl = $baseURL . '/certificates/' . $fileName;
+
+                // Delete the old file from S3 if it exists
+                if ($certificate->certificate_upload) {
+                    $oldFilePath = str_replace($baseURL . '/', '', $certificate->certificate_upload);
+                    Storage::disk('s3')->delete($oldFilePath);
+                }
 
                 // Update the certificate record with the new file path
                 $certificate->update([
@@ -223,19 +215,11 @@ class CertificateController extends Controller
                 'fsa_id' => $request->fsa_id ?? $certificate->fsa_id,
                 'issued_date' => $request->issued_date ?? $certificate->issued_date,
                 'expiry_date' => $request->expiry_date ?? $certificate->expiry_date,
-                'created_by' => $user->id,
-                'created_by_type' => get_class($user),
             ]);
-
-            // Add the file URL to the response if a new file was uploaded
-            if (isset($documentUrl)) {
-                $certificate->certificate_upload_url = $documentUrl;
-            }
 
             return response()->json([
                 'message' => 'Certificate updated successfully',
                 'data' => $certificate,
-                'certificate_upload_url' => $documentUrl ?? null,
             ], 200);
         } catch (\Illuminate\Validation\ValidationException $e) {
             // Handle validation errors
