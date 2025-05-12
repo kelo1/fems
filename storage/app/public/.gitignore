@@ -1,2 +1,5 @@
 *
 !.gitignore
+
+# Ignore the VerifyCsrfToken.php file
+app/Http/Middleware/VerifyCsrfToken.php
