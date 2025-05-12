@@ -359,10 +359,7 @@ class EquipmentController extends Controller
             // Handle service_provider_id if provided
             if ($request->has('service_provider_id')) {
                 // Check if the equipment has been assigned to a client
-                if ($equipment->client_id == null) {
-                    return response()->json(['message' => 'No client has been assigned to the equipment'], 400);
-                }
-
+               
                 // Update the client record by setting created_by to the new service_provider_id
                 $client = Client::find($equipment->client_id);
                 if ($client) {
