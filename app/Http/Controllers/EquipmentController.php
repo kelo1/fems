@@ -499,6 +499,10 @@ class EquipmentController extends Controller
                     ->where('status_client', 1)
                     ->update(['status_client' => 0]);
 
+                     // Update the service provider ID in the equipment record
+                $equipment->client_id = $request->client_id;
+                $equipment->save();
+
                 // Insert a new client record
                 \DB::table('equipment_clients')->insert([
                     'equipment_id' => $id,
