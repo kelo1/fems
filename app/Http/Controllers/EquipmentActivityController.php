@@ -31,6 +31,7 @@ class EquipmentActivityController extends Controller
             // Validate the request
             $request->validate([
                 'device_serial_number' => 'required|string|exists:service_provider_devices,device_serial_number',
+                'equipment_id' => 'required|exists:equipment,id',
                 'activity' => 'nullable|string',
                 'next_maintenance_date' => 'nullable|date',
                 'service_provider_id' => 'nullable|exists:service_providers,id',
