@@ -36,7 +36,6 @@ class EquipmentActivityController extends Controller
                 'next_maintenance_date' => 'nullable|date',
                 'service_provider_id' => 'nullable|exists:service_providers,id',
                 'client_id' => 'nullable|exists:clients,id',
-                'equipment_id' => 'nullable|exists:equipment,id'
             ]);
 
             // Check if the device_serial_number exists in ServiceProviderDevices and it belongs to the service provider
