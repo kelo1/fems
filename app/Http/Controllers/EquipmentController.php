@@ -818,6 +818,16 @@ public function createIndividualClientEquipment(Request $request, $serial_number
         $equipment->client_id = $client->id;
         $equipment->save();
 
+        // insert a new record in the equipment_clients table
+        \DB::table('equipment_clients')->insert([
+            'equipment_id' => $equipment->id,
+            'serial_number' => $equipment->serial_number,
+            'client_id' => $client->id,
+            'status_client' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         return response()->json(['message' => 'Individual client created and assigned to equipment successfully', 'client' => $client], 201);
     } catch (\Exception $e) {
         \Log::error('Error in createIndividualClientEquipment method', [
@@ -859,6 +869,17 @@ public function createCorporateClientEquipment(Request $request, $serial_number)
         // Assign the client_id to the equipment
         $equipment->client_id = $clientData->client->id;
         $equipment->save();
+
+          // insert a new record in the equipment_clients table
+        \DB::table('equipment_clients')->insert([
+            'equipment_id' => $equipment->id,
+            'serial_number' => $equipment->serial_number,
+            'client_id' => $client->id,
+            'status_client' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
 
         return response()->json(['message' => 'Corporate client created and assigned to equipment successfully', 'client' => $client], 201);
     } catch (\Exception $e) {
