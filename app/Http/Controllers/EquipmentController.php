@@ -518,6 +518,10 @@ class EquipmentController extends Controller
                     ->where('status_service_provider', 1)
                     ->update(['status_service_provider' => 0]);
 
+                // Update the service provider ID in the equipment record
+                $equipment->service_provider_id = $request->service_provider_id;
+                $equipment->save();    
+
                 // Insert a new service provider record
                 \DB::table('equipment_service_providers')->insert([
                     'equipment_id' => $id,
