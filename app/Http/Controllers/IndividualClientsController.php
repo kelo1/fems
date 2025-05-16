@@ -144,25 +144,32 @@ class IndividualClientsController extends Controller
             return response(['message' => 'Unauthorized'], 403);
         }
 
-        // Validate client and individual client details
-        try {
-            $request->validate([
-                'email' => 'required|email|unique:clients,email',
-                'phone' => 'required|string|max:15|unique:clients,phone',
-                'client_type' => 'required|string|exists:customer_types,name',
-                'first_name' => 'required|string|max:255',
-                'middle_name' => 'nullable|string|max:255',
-                'last_name' => 'required|string|max:255',
-                'address' => 'required|string|max:255',
-                'gps_address' => 'nullable|string|max:255',
-                'document_type' => 'required|string|in:PASSPORT,NATIONAL_ID',
-                'document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
-            ]);
-            Log::info('Validation passed successfully.', ['request_data' => $request->all()]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('Validation failed.', ['errors' => $e->errors()]);
-            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+         // Validate client and individual client details
+    try {
+        $request->validate([
+            'email' => 'required|email|unique:clients,email',
+            'phone' => 'required|string|max:15|unique:clients,phone',
+            'client_type' => 'required|string|exists:customer_types,name',
+            'first_name' => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'address' => 'required|string|max:255',
+            'gps_address' => 'nullable|string|max:255',
+            'document_type' => 'required|string|in:PASSPORT,NATIONAL_ID',
+            'document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
+        ]);
+        Log::info('Validation passed successfully.', ['request_data' => $request->all()]);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        // Return all validation errors as a flat array of messages
+        $messages = [];
+        foreach ($e->validator->errors()->messages() as $field => $fieldErrors) {
+            foreach ($fieldErrors as $error) {
+                $messages[] = $error;
+            }
         }
+        Log::error('Validation failed.', ['errors' => $messages]);
+        return response()->json(['message' => 'Validation failed', 'errors' => $messages], 422);
+    }
         
         Log::info('Validation passed successfully.', ['request_data' => $request->all()]);
 

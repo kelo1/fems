@@ -154,7 +154,8 @@ class CorporateClientsController extends Controller
             return response(['message' => 'Unauthorized'], 403);
         }
 
-        // Validate client details and file uploads
+        // Catch all validation errors for the request
+    try {
         $request->validate([
             'email' => 'required|email|unique:clients,email',
             'phone' => 'required|string|max:15|unique:clients,phone',
@@ -167,6 +168,19 @@ class CorporateClientsController extends Controller
             'gps_address' => 'nullable|string|max:255',
             'corporate_type_id' => 'required|integer|exists:corporate_types,id',
         ]);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        // Return all validation errors as a flat array of messages
+        $messages = [];
+        foreach ($e->validator->errors()->messages() as $field => $fieldErrors) {
+            foreach ($fieldErrors as $error) {
+                $messages[] = $error;
+            }
+        }
+        return response()->json([
+            'message' => 'Validation failed',
+            'errors' => $messages
+        ], 422);
+    }
 
         try {
             \DB::beginTransaction();

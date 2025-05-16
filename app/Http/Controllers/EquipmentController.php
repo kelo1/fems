@@ -65,15 +65,28 @@ class EquipmentController extends Controller
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
 
-            // Validate the request
-            $request->validate([
-                'name' => 'required|string|max:255',
-                'description' => 'required|string',
-                'service_provider_id' => 'nullable|integer|exists:service_providers,id',
-                'client_id' => 'nullable|integer|exists:clients,id',
-                'date_of_manufacturing' => 'required|date',
-                'expiry_date' => 'required|date|after:date_of_manufacturing',
-            ]);
+            // Validate the request and catch all validation errors
+            try {
+                $request->validate([
+                    'name' => 'required|string|max:255',
+                    'description' => 'required|string',
+                    'service_provider_id' => 'nullable|integer|exists:service_providers,id',
+                    'client_id' => 'nullable|integer|exists:clients,id',
+                    'date_of_manufacturing' => 'required|date',
+                    'expiry_date' => 'required|date|after:date_of_manufacturing',
+                ]);
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                $messages = [];
+                foreach ($e->validator->errors()->messages() as $field => $fieldErrors) {
+                    foreach ($fieldErrors as $error) {
+                        $messages[] = $error;
+                    }
+                }
+                return response()->json([
+                    'message' => 'Validation failed',
+                    'errors' => $messages
+                ], 422);
+            }
 
             // Log the user ID and user class
             \Log::info('Equipment creation initiated by user', [

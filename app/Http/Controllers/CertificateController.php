@@ -366,6 +366,63 @@ class CertificateController extends Controller
         }
     }
 
+    public function getCertificateBySerialNumber($serial_number){
+
+        // Verify if the user is authenticated
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        // Check if the user has the required role
+        if (get_class($user) != "App\Models\FireServiceAgent" && get_class($user) != "App\Models\FEMSAdmin") {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        try {
+            // Retrieve the certificate by ID
+            $certificate = Certificate::with('certificateType', 'fireServiceAgent', 'client')
+                ->where('serial_number', $serial_number)
+                ->firstOrFail();
+
+            // Check if the certificate has expired and update the status if necessary
+            if (now()->greaterThan($certificate->expiry_date)) {
+                $certificate->status = 'expired';
+                $certificate->save(); // Update the status in the database
+            }
+
+            // Add client name based on client_type
+            if ($certificate->client) {
+                if ($certificate->client->client_type === 'INDIVIDUAL') {
+                    $individualClient = \DB::table('individual_clients')
+                        ->where('client_id', $certificate->client->id)
+                        ->first(['first_name', 'middle_name', 'last_name']);
+                    $certificate->client->name = $individualClient
+                        ? trim("{$individualClient->first_name} {$individualClient->middle_name} {$individualClient->last_name}")
+                        : null;
+                } elseif ($certificate->client->client_type === 'CORPORATE') {
+                    $certificate->client->name = \DB::table('corporate_clients')
+                        ->where('client_id', $certificate->client->id)
+                        ->value('company_name');
+                }
+            }
+
+            $certificate->isVerified = $this->isCertificateVerified($certificate->isVerified);
+
+            return response()->json(['message' => 'Certificate retrieved successfully', 'data' => $certificate], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            \Log::error('Certificate not found in getCertificateByID method', [
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['message' => 'Certificate not found', 'error' => $e->getMessage()], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error in CertificatesController@getCertificateByID', [
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['message' => 'An error occurred while retrieving the certificate', 'error' => $e->getMessage()], 500);
+        }
+    }
+
     public function getCertificateByCertificateType($certificate_type_id)
     {
         try {

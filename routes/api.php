@@ -26,6 +26,7 @@ use App\Http\Controllers\EquipmentActivityController;
 use App\Http\Controllers\ServiceProviderDevicesController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\CertificateTypeController;
+use App\Http\Controllers\NotificationController;
 
 
 
@@ -246,8 +247,9 @@ Route::group(['middleware'=>['web','auth:sanctum']], function(){
   Route::put('/certificate_type/update/{id}', [CertificateTypeController::class, 'update'])->name('update_certificate_type');
   Route::delete('/certificate_type/{id}', [CertificateTypeController::class, 'destroy'])->name('delete_certificate_type');
   Route::get('/certificate_type/{id}', [CertificateTypeController::class, 'show'])->name('certificate_type_show');
+  Route::get('/certificate_type/name/{name}', [CertificateTypeController::class, 'getCertificateTypeByName'])->name('certificate_type_by_name');
 
-  //Proteceted Certificate Routes
+  //Protected Certificate Routes
   Route::get('/certificate/all', [CertificateController::class, 'index'])->name('all_certificates');
   Route::post('/certificate/create', [CertificateController::class, 'store'])->name('create_certificate');
   Route::put('/certificate/update/{id}', [CertificateController::class, 'update'])->name('update_certificate');
@@ -255,6 +257,15 @@ Route::group(['middleware'=>['web','auth:sanctum']], function(){
   Route::get('/certificate/{id}', [CertificateController::class, 'getCertificateByID'])->name('certificate_show');
   Route::get('/certificate/client/{client_id}', [CertificateController::class, 'getCertificateByClientID'])->name('certificate_by_client');
   Route::get('/certificates/type/{certificate_type_id}', [CertificateController::class, 'getCertificateByCertificateType']);
+  Route::get('/certificate/serial_number/{serial_number}', [CertificateController::class, 'getCertificateBySerialNumber'])->name('certificate_by_serial_number');
+
+  //Protected Notification Routes
+  Route::get('/notifications/all', [NotificationController::class, 'index'])->name('notifications');
+  Route::get('/notifications/{id}', [NotificationController::class, 'show'])->name('notification_show');
+  Route::post('/notifications/read/{id}', [NotificationController::class, 'markAsRead'])->name('mark_notification_as_read');
+  Route::post('/notifications/mark-all-read/all', [NotificationController::class, 'markAllAsRead'])->name('mark_all_notifications_as_read');
+  Route::get('/notifications/all/unread-count', [NotificationController::class, 'getUnreadCount'])->name('unread_notification_count');
+  Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('delete_notification');
 
 });
 
