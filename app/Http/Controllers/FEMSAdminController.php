@@ -74,7 +74,12 @@ class FEMSAdminController extends Controller
 
         if ($femsAdmin && Hash::check($credentials['password'], $femsAdmin->password)) {
             $token = $femsAdmin->createToken('auth_token')->plainTextToken;
-            return response()->json(['message' => 'Login successful', 'femsAdmin' => $femsAdmin, 'token' => $token]);
+            return response()->json([
+                'message' => 'Login successful',
+                'femsAdmin' => $femsAdmin->only('id', 'name'),
+                'token' => $token,
+                'user_type' => "FEMSAdmin",
+            ], 200);
         }
 
         return response()->json(['message' => 'Invalid credentials'], 401);

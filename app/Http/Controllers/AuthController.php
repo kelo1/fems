@@ -402,7 +402,7 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'User signed in successfully',
             'token' => $token,
-            'user' => $user,
+            'user' => $user->only('name'),
             'id' => $user->id,
             'user_type' => $userType,
         ], 200);
