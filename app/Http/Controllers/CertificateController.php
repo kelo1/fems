@@ -279,7 +279,7 @@ class CertificateController extends Controller
                 ->get();
 
             if ($certificates->isEmpty()) {
-                return response()->json(['message' => 'No certificates found for the specified client'], 404);
+                return response()->json(['message' => 'No certificates found for the specified client'], 200);
             }
 
             // Add client name based on client_type
@@ -357,7 +357,7 @@ class CertificateController extends Controller
             \Log::error('Certificate not found in getCertificateByID method', [
                 'error' => $e->getMessage(),
             ]);
-            return response()->json(['message' => 'Certificate not found', 'error' => $e->getMessage()], 404);
+            return response()->json(['message' => 'Certificate not found', 'error' => $e->getMessage()], 200);
         } catch (\Exception $e) {
             \Log::error('Error in CertificatesController@getCertificateByID', [
                 'error' => $e->getMessage(),
@@ -414,7 +414,7 @@ class CertificateController extends Controller
             \Log::error('Certificate not found in getCertificateByID method', [
                 'error' => $e->getMessage(),
             ]);
-            return response()->json(['message' => 'Certificate not found', 'error' => $e->getMessage()], 404);
+            return response()->json(['message' => 'Certificate not found', 'error' => $e->getMessage()], 200);
         } catch (\Exception $e) {
             \Log::error('Error in CertificatesController@getCertificateByID', [
                 'error' => $e->getMessage(),
@@ -443,7 +443,7 @@ class CertificateController extends Controller
                 ->get();
 
             if ($certificates->isEmpty()) {
-                return response()->json(['message' => 'No certificates found for the specified certificate type'], 404);
+                return response()->json(['message' => 'No certificates found for the specified certificate type'], 200);
             }
 
             // Add isVerified status to each certificate

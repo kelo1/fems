@@ -374,7 +374,7 @@ public function getInvoiceByFSA($fsaId)
 
         if ($invoices->isEmpty()) {
             \Log::info('No invoices found for the FSA', ['fsa_id' => $fsaId]);
-            return response(['message' => 'No invoices found for the FSA'], 404);
+            return response(['message' => 'No invoices found for the FSA'], 200);
         }
 
         // Add client details dynamically based on client_type

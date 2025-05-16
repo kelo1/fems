@@ -260,7 +260,7 @@ class EquipmentController extends Controller
                 ->get();
 
             if ($equipment->isEmpty()) {
-                return response()->json(['message' => 'No equipment found for the specified client'], 404);
+                return response()->json(['message' => 'No equipment found for the specified client'], 200);
             }
 
             // Add equipment status to each equipment
@@ -646,10 +646,11 @@ class EquipmentController extends Controller
         try {
             // Retrieve all equipment created by the given service provider
             $equipment = Equipment::where('created_by', $service_provider_id) // Filter by service provider who created the equipment
-              ->get();
+                ->where('created_by_type', 'App\Models\ServiceProvider') // Ensure the created_by_type is ServiceProvider
+                ->get();
 
             if ($equipment->isEmpty()) {
-                return response()->json(['message' => 'No equipment found for the specified service provider'], 404);
+                return response()->json(['message' => 'No equipment found for the specified service provider'], 200);
             }
 
             // Add equipment status to each equipment

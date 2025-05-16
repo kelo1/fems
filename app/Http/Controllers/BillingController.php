@@ -29,7 +29,7 @@ class BillingController extends Controller
                             ->get();
 
         if ($billings->isEmpty()) {
-            return response()->json(['message' => 'No billings found for this service provider'], 404);
+            return response()->json(['message' => 'No billings found for this service provider'], 200);
         }
 
         return response()->json(['message' => 'Billings retrieved successfully', 'data' => $billings], 200);
@@ -42,7 +42,7 @@ class BillingController extends Controller
                             ->get();
 
         if ($billings->isEmpty()) {
-            return response()->json(['message' => 'No billings found for this FSA'], 404);
+            return response()->json(['message' => 'No billings found for this FSA'], 200);
         }
 
         return response()->json(['message' => 'Billings retrieved successfully', 'data' => $billings], 200);
@@ -142,7 +142,7 @@ class BillingController extends Controller
         $billings = Billing::where('DESCRIPTION', 'like', '%' . $search . '%')->get();
 
         if ($billings->isEmpty()) {
-            return response()->json(['message' => 'No billings found'], 404);
+            return response()->json(['message' => 'No billings found'], 200);
         }
 
         return response()->json(['message' => 'Billings retrieved successfully', 'data' => $billings], 200);

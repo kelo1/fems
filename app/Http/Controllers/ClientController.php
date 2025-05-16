@@ -1046,7 +1046,7 @@ class ClientController extends Controller
                 });
 
             if ($clientHistories->isEmpty()) {
-                return response()->json(['message' => 'No history found for the specified client'], 404);
+                return response()->json(['message' => 'No history found for the specified client'], 200);
             }
 
             return response()->json([

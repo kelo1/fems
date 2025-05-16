@@ -489,7 +489,7 @@ class InvoicingController extends Controller
 
             if ($invoices->isEmpty()) {
                 \Log::info('No invoices found for the service provider', ['service_provider_id' => $serviceProviderId]);
-                return response(['message' => 'No invoices found for the service provider'], 404);
+                return response(['message' => 'No invoices found for the service provider'], 200);
             }
 
             // Add client details dynamically based on client_type
@@ -526,7 +526,7 @@ class InvoicingController extends Controller
 
             if ($invoices->isEmpty()) {
                 \Log::info('No invoices found for the client', ['client_id' => $clientId]);
-                return response(['message' => 'No invoices found for the client'], 404);
+                return response(['message' => 'No invoices found for the client'], 200);
             }
 
             // Add client details dynamically based on client_type
