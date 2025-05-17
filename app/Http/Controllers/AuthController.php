@@ -741,17 +741,37 @@ class AuthController extends Controller
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
 
-            // Fetch the required statistics
-            $totalSPInvoices = Invoicing::count(); // Total number of invoices by Service Provider
-           $invoicebyFSA = InvoicesbyFSA::count(); // Total number of invoices by FSA
+            // Get today's date in Y-m-d format
+            $today = now()->toDateString();
+
+            // Build queries filtered by today
+            $spQuery = Invoicing::whereDate('created_at', $today);
+            $fsaQuery = InvoicesbyFSA::whereDate('created_at', $today);
+
+            // Total number of invoices by Service Provider (today)
+            $totalSPInvoices = $spQuery->count();
+
+            // Total number of invoices by FSA (today)
+            $invoicebyFSA = $fsaQuery->count();
+
+            // Total sum of payment amounts for Service Providers' invoices (today)
+            $totalSPPayments = $spQuery->sum('payment_amount');
+
+            // Total sum of payment amounts for FSA Agents' invoices (today)
+            $totalFSAPayments = $fsaQuery->sum('payment_amount');
+
+            // Total sum of all payments (Service Providers + FSA Agents)
+            $totalAllPayments = $totalSPPayments + $totalFSAPayments;
 
             // Return the statistics
             return response()->json([
-                'message' => 'Dashboard statistics retrieved successfully',
+                'message' => 'Dashboard statistics for today retrieved successfully',
                 'data' => [
                     'total_service_provider_invoices' => $totalSPInvoices,
-                    'total_FSA_invoices' => $invoicebyFSA
-
+                    'total_FSA_invoices' => $invoicebyFSA,
+                    'total_service_provider_payments' => $totalSPPayments,
+                    'total_FSA_payments' => $totalFSAPayments,
+                    'total_all_payments' => $totalAllPayments,
                 ],
             ], 200);
         } catch (\Exception $e) {
@@ -830,6 +850,64 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             \Log::error('Error in dashboard method', ['error' => $e->getMessage()]);
             return response()->json(['message' => 'An error occurred while retrieving dashboard statistics'], 500);
+        }
+    }
+
+    public function graReport(Request $request)
+    {
+        try {
+            // Ensure the authenticated user is a GRA
+            $gra = Auth::user();
+            if (get_class($gra) != "App\Models\GRA") {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            // Get date boundaries from request (optional)
+            $startDate = $request->query('start_date');
+            $endDate = $request->query('end_date');
+
+            // Build queries with optional date filtering
+            $spQuery = Invoicing::query();
+            $fsaQuery = InvoicesbyFSA::query();
+
+            if ($startDate) {
+                $spQuery->whereDate('created_at', '>=', $startDate);
+                $fsaQuery->whereDate('created_at', '>=', $startDate);
+            }
+            if ($endDate) {
+                $spQuery->whereDate('created_at', '<=', $endDate);
+                $fsaQuery->whereDate('created_at', '<=', $endDate);
+            }
+
+            // Total number of invoices by Service Provider (filtered)
+            $totalSPInvoices = $spQuery->count() ?? 0;
+
+            // Total number of invoices by FSA (filtered)
+            $invoicebyFSA = $fsaQuery->count() ?? 0;
+
+            // Total sum of payment amounts for Service Providers' invoices (filtered)
+            $totalSPPayments = $spQuery->sum('payment_amount') ?? 0;
+
+            // Total sum of payment amounts for FSA Agents' invoices (filtered)
+            $totalFSAPayments = $fsaQuery->sum('payment_amount') ?? 0;
+
+            // Total sum of all payments (Service Providers + FSA Agents)
+            $totalAllPayments = $totalSPPayments + $totalFSAPayments;
+
+            // Return the statistics (always output 0 if no records)
+            return response()->json([
+                'message' => 'Report statistics retrieved successfully',
+                'data' => [
+                    'total_service_provider_invoices' => $totalSPInvoices,
+                    'total_FSA_invoices' => $invoicebyFSA,
+                    'total_service_provider_payments' => $totalSPPayments,
+                    'total_FSA_payments' => $totalFSAPayments,
+                    'total_all_payments' => $totalAllPayments,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error in graReport method', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'An error occurred while retrieving report statistics'], 500);
         }
     }
 }

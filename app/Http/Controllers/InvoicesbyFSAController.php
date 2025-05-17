@@ -73,7 +73,7 @@ class InvoicesbyFSAController extends Controller
     public function generateInvoice(Request $request)
     {
         try {
-            \Log::info('Generate Invoice Request Received', $request->all());
+            \Log::info('Generate FSA Invoice Request Received', $request->all());
 
             $user = Auth::user();
             if (!$user) {
@@ -90,6 +90,8 @@ class InvoicesbyFSAController extends Controller
 
             $client_id = $request->client_id;
             $Invoice_items = $request->InvoiceItems;
+            // Accept discount as an optional field
+            $discount = $request->input('discount', 0);
 
             if (!$client_id  || !$Invoice_items) {
                 \Log::error('Missing required parameters', [
@@ -223,8 +225,7 @@ class InvoicesbyFSAController extends Controller
                     ->taxByPercent($vatRate); // Laravel Daily Invoice tax field
             
                 $items[] = $item;
-            
-                // Log processed invoice item
+
                 \Log::info('Invoice item processed', [
                     'description' => $itemDescription,
                     'quantity' => $quantity,
@@ -239,10 +240,25 @@ class InvoicesbyFSAController extends Controller
             // Deduct total withholding tax from the total amount
             $totalAmount -= $totalWithholdingTax;
 
+            // Apply discount if provided and greater than 0
+            $finalAmount = $totalAmount;
+            $discountNote = '';
+            if ($discount && $discount > 0) {
+                $finalAmount -= $discount;
+                $discountNote = "Discount applied: GH₵" . number_format($discount, 2);
+            }
+
+            // Prepare notes for the invoice
+            $notes = "Withholding tax (not deducted from payable amount): GH₵" . number_format($totalWithholdingTax, 2);
+            if ($discountNote) {
+                $notes .= "\n" . $discountNote;
+            }
+
             $invoice_number = $this->generateRandomSequence();
+
             // Generate the invoice
             $invoice = Invoice::make()
-                ->series('PP')
+                ->series('FSA')
                 ->sequence($invoice_number)
                 ->serialNumberFormat('{SERIES}{SEQUENCE}')
                 ->seller($seller)
@@ -255,14 +271,14 @@ class InvoicesbyFSAController extends Controller
                 ->currencyFormat('{SYMBOL}{VALUE}')
                 ->currencyThousandsSeparator(',')
                 ->currencyDecimalPoint('.')
-                ->filename(Str::slug($client_name, '_') . '_' . 'PP' . $invoice_number . '_invoice')
+                ->filename(Str::slug($client_name, '_') . '_' . 'FSA' . $invoice_number . '_fsa_invoice')
                 ->addItems($items)
-                ->notes("Withholding tax (not deducted from payable amount): GH₵" . number_format($totalWithholdingTax, 2))
+                ->notes($notes)
                 ->logo(public_path('storage/fems/logo.jpg'))
                 ->template('custom')
                 ->save('invoices');
 
-            \Log::info('Invoice generated', ['filename' => $invoice->filename]);
+            \Log::info('FSA Invoice generated', ['filename' => $invoice->filename]);
 
             // Save invoice details to the database
             DB::table('invoices_by_fsa')->insert([
@@ -271,29 +287,28 @@ class InvoicesbyFSAController extends Controller
                 'client_id' => $client_id,
                 'invoice_details' => json_encode($Invoice_items), // Save as JSON string
                 'invoice' => $invoice->filename,
-                'payment_amount' => $totalAmount,
+                'payment_amount' => $finalAmount,
                 'created_by' => $user->id,
                 'created_by_type' => get_class($user),
                 'payment_status' => 0,
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),
             ]);
-            \Log::info('Invoice record inserted into database');
+            \Log::info('FSA Invoice record inserted into database');
 
             return response([
-                'message' => 'Invoice generated successfully!',
-                'url' => Storage::disk('s3')->url('invoices/'. $invoice->filename),
-               // 'url' => Storage::url($invoice->filename),  // Use this for s3 storage
+                'message' => 'FSA Invoice generated successfully!',
+                'url' => Storage::disk('s3')->url('invoices/' . $invoice->filename),
                 'filename' => $invoice->filename,
                 'total_withholding_tax' => $totalWithholdingTax,
-    'total_amount' => $totalAmount,
+                'total_amount' => $finalAmount,
             ], 201);
         } catch (\Exception $e) {
-            \Log::error('Exception occurred in generateInvoice', [
+            \Log::error('Exception occurred in generateInvoice (FSA)', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            return response(['message' => 'An error occurred while generating the invoice'], 500);
+            return response(['message' => 'An error occurred while generating the FSA invoice'], 500);
         }
     }
 

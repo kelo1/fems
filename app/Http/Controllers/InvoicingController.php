@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Equipment;
 use App\Models\Billing;
 use App\Models\ServiceProvider;
+use App\Models\InvoicesbyFSA;
 use App\Models\ServiceProviderVAT;
 use App\Models\Client;
 use App\Models\Corporate_clients;
@@ -102,6 +103,8 @@ class InvoicingController extends Controller
             $client_id = $request->client_id;
             $serial_number = $request->serial_number;
             $Invoice_items = $request->InvoiceItems;
+             // Accept discount as an optional field
+            $discount = $request->input('discount', 0);
 
             if (!$client_id || !$serial_number || !$Invoice_items) {
                 \Log::error('Missing required parameters', [
@@ -279,6 +282,20 @@ class InvoicingController extends Controller
             // Deduct total withholding tax from the total amount
             $totalAmount -= $totalWithholdingTax;
 
+             // Apply discount if provided and greater than 0
+            $finalAmount = $totalAmount;
+            $discountNote = '';
+            if ($discount && $discount > 0) {
+                $finalAmount -= $discount;
+                $discountNote = "Discount applied: GH₵" . number_format($discount, 2);
+            }
+
+            // Prepare notes for the invoice
+            $notes = "Withholding tax (not deducted from payable amount): GH₵" . number_format($totalWithholdingTax, 2);
+            if ($discountNote) {
+                $notes .= "\n" . $discountNote;
+            }
+
             
 
             // Generate the invoice
@@ -298,7 +315,8 @@ class InvoicingController extends Controller
                 ->currencyDecimalPoint('.')
                 ->filename(Str::slug($client_name, '_') . '_' . $serial_number . '_invoice')
                 ->addItems($items)
-                ->notes("Withholding tax (not deducted from payable amount): GH₵" . number_format($totalWithholdingTax, 2))
+                //->notes("Withholding tax (not deducted from payable amount): GH₵" . number_format($totalWithholdingTax, 2))
+                ->notes($notes)
                 ->logo(public_path('storage/fems/logo.jpg'))
                 ->save('invoices');
 
@@ -312,7 +330,7 @@ class InvoicingController extends Controller
                 'client_id' => $client_id,
                 'invoice_details' => json_encode($Invoice_items), // Save as JSON string
                 'invoice' => $invoice->filename,
-                'payment_amount' => $totalAmount,
+                'payment_amount' => $finalAmount,
                 'created_by' => $user->id,
                 'created_by_type' => get_class($user),
                 'payment_status' => 0,
@@ -327,7 +345,7 @@ class InvoicingController extends Controller
                // 'url' => Storage::url($invoice->filename),  // Use this for s3 storage
                 'filename' => $invoice->filename,
                 'total_withholding_tax' => $totalWithholdingTax,
-    'total_amount' => $totalAmount,
+    'total_amount' => $finalAmount,
             ], 201);
         } catch (\Exception $e) {
             \Log::error('Exception occurred in generateInvoice', [

@@ -116,6 +116,7 @@ Route::group(['middleware'=>['web','auth:sanctum']], function(){
   Route::get('/service_provider/dashboard', [AuthController::class, 'serviceProviderDashboard'])->name('service_provider_dashboard');
   Route::get('/fire_service_agent/dashboard', [AuthController::class, 'fireServiceAgentDashboard'])->name('fire_service_agent_dashboard');
   Route::get('/gra/dashboard', [AuthController::class, 'graDashboard'])->name('gra_dashboard');
+  Route::post('/gra_report', [AuthController::class, 'graReport'])->name('gra_report');
 
   //Protected Client Routes
   Route::post('/client/create_corporate_client', [ClientController::class, 'createCorporateClient'])->name('register_corporate_client');
