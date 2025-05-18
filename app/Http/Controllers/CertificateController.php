@@ -228,7 +228,6 @@ class CertificateController extends Controller
 
             return response()->json([
                 'message' => 'Certificate updated successfully',
-                'data' => $certificate,
             ], 200);
         } catch (\Illuminate\Validation\ValidationException $e) {
             // Handle validation errors

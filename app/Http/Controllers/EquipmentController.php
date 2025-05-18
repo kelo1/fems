@@ -134,7 +134,8 @@ class EquipmentController extends Controller
                 }
             }
 
-            return response()->json(['message' => 'Equipment created successfully', 'equipment' => $equipment], 201);
+            return response()->json(['message' => 'Equipment created successfully'
+            ], 201);
         } catch (\Exception $e) {
             // Log the error
             \Log::error('Error in store method', [
@@ -561,7 +562,6 @@ class EquipmentController extends Controller
 
             return response()->json([
                 'message' => 'Equipment updated successfully',
-                'data' => $equipment,
             ], 200);
         } catch (\Exception $e) {
             // Log the error

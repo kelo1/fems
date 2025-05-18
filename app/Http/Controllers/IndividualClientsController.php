@@ -171,8 +171,7 @@ class IndividualClientsController extends Controller
         return response()->json(['message' => 'Validation failed', 'errors' => $messages], 422);
     }
         
-        Log::info('Validation passed successfully.', ['request_data' => $request->all()]);
-
+        
         \DB::beginTransaction();
         Log::info('Starting transaction to store individual client.');
 
@@ -254,8 +253,6 @@ class IndividualClientsController extends Controller
 
             return response()->json([
                 'message' => 'Individual client created successfully',
-                'client' => $client,
-                'document_url' => $documentUrl,
             ], 201);
         } catch (\Exception $e) {
             \DB::rollBack();

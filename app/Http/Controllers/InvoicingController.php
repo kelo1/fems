@@ -92,8 +92,7 @@ class InvoicingController extends Controller
     public function generateInvoice(Request $request)
     {
         try {
-            \Log::info('Generate Invoice Request Received', $request->all());
-
+           
             $user = Auth::user();
             if (!$user) {
                 \Log::error('Unauthorized access attempt');

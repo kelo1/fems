@@ -73,8 +73,7 @@ class InvoicesbyFSAController extends Controller
     public function generateInvoice(Request $request)
     {
         try {
-            \Log::info('Generate FSA Invoice Request Received', $request->all());
-
+           
             $user = Auth::user();
             if (!$user) {
                 \Log::error('Unauthorized access attempt');

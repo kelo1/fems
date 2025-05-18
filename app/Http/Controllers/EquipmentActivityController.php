@@ -118,7 +118,7 @@ class EquipmentActivityController extends Controller
 
             \DB::commit();
 
-            return response()->json(['message' => 'Equipment activity created successfully', 'activity' => $activity], 201);
+            return response()->json(['message' => 'Equipment activity created successfully'], 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
             // Rollback the transaction and log validation errors
             \DB::rollBack();

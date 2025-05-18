@@ -57,8 +57,7 @@ class ClientController extends Controller
     // Bulk upload clients
     public function bulkUpload(Request $request)
     {
-        \Log::info('ClientController bulkUpload method called', $request->all());
-
+    
         // Authenticate user
         $user = Auth::user();
 
@@ -505,8 +504,7 @@ class ClientController extends Controller
     public function getClientByCorporateType(Request $request)
     {
         try {
-            \Log::info('getClientsByCorporateType method called', $request->all());
-    
+          
             // Authenticate the user
             $user = Auth::user();
             if (!$user) {
@@ -636,8 +634,7 @@ class ClientController extends Controller
     public function getClientByIndividual(Request $request)
     {
         try {
-            \Log::info('getClientByIndividual method called', $request->all());
-
+          
             // Authenticate the user
             $user = Auth::user();
 

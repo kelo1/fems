@@ -238,9 +238,6 @@ class CorporateClientsController extends Controller
 
             return response()->json([
                 'message' => 'Corporate client created successfully',
-                'client' => $client,
-                'certificate_url' => $certificateUrl,
-                'registration_url' => $registrationUrl,
             ], 201);
         } catch (\Exception $e) {
             \DB::rollBack();

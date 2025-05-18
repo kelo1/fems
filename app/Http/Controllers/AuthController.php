@@ -119,8 +119,7 @@ class AuthController extends Controller
 
      public function signUp(Request $request)
     {
-    \Log::info("SignUp method called", $request->all());
-
+ 
     // Validate request
     $validator = \Validator::make($request->all(), [
         'name' => 'required|string|max:255',
@@ -335,8 +334,7 @@ class AuthController extends Controller
     public function signIn(Request $request)
     {
     try {
-        \Log::info('SignIn method called', ['request' => $request->all()]);
-
+      
         $request->validate([
             'email' => 'required|string|email',
             'password' => 'required|string',
@@ -442,8 +440,7 @@ class AuthController extends Controller
     public function updateIsActive(Request $request, $id, ?bool $isActive = null)
     {
         try {
-            \Log::info('updateIsActive method called', ['id' => $id, 'request_data' => $request->all(), 'isActive' => $isActive]);
-    
+         
             $request->validate([
                 'user_type' => ['required', Rule::in(['SERVICE_PROVIDER', 'FSA_AGENT', 'GRA_PERSONNEL'])],
             ]);
@@ -497,8 +494,7 @@ class AuthController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            \Log::info('update method called', ['id' => $id, 'request_data' => $request->all()]);
-    
+          
             $request->validate([
                 'user_type' => ['required', Rule::in(['SERVICE_PROVIDER', 'FSA_AGENT', 'GRA_PERSONNEL'])],
             ]);
@@ -537,8 +533,7 @@ class AuthController extends Controller
     public function showbyUserType(Request $request)
     {
         try {
-            \Log::info('showbyUserType method called', ['request_data' => $request->all()]);
-    
+          
             // Validate the request
             $request->validate([
                 'user_type' => ['required', Rule::in(['SERVICE_PROVIDER', 'FSA_AGENT', 'GRA_PERSONNEL'])],
@@ -578,8 +573,7 @@ class AuthController extends Controller
     public function destroy(Request $request, $id)
     {
         try {
-            \Log::info('destroy method called', ['id' => $id, 'request_data' => $request->all()]);
-
+            
             // Validate the request
             $request->validate([
                 'user_type' => ['required', Rule::in(['SERVICE_PROVIDER', 'FSA_AGENT', 'GRA_PERSONNEL'])],
