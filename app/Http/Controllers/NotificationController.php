@@ -18,6 +18,29 @@ class NotificationController extends Controller
         if (!$user) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
+        
+        // Check if $user is an instance of FEMSAdmin
+        if($user instanceof \App\Models\FEMSAdmin) {
+            $notifications = Notification::where('notifiable_id', $user->id)
+                ->where('notifiable_type', get_class($user))
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function ($notification) {
+                    $data = $notification->data ?? [];
+                    return [
+                        'id'             => $notification->id,
+                        'serial_number'  => $data['serial_number'] ?? null,
+                        'title'          => $data['title'] ?? null,
+                        'message'        => $data['message'] ?? null,
+                        'status'         => $data['status'] ?? 'unread',
+                        'read_at'        => $notification->read_at,
+                        'created_at'     => $notification->created_at,
+                        'updated_at'     => $notification->updated_at,
+                    ];
+                });
+            return response()->json(['notifications' => $notifications], 200);
+        }
+
 
         $notifications = Notification::where('notifiable_id', $user->id)
             ->where('notifiable_type', get_class($user))
@@ -120,6 +143,23 @@ class NotificationController extends Controller
         if (!$notification) {
             return response()->json(['message' => 'Notification not found'], 404);
         }
+
+        // Get notification data for FEMSAdmin
+        if($user instanceof \App\Models\FEMSAdmin) {
+            $data = $notification->data ?? [];
+            $result = [
+                'id'             => $notification->id,
+                'serial_number'  => $data['serial_number'] ?? null,
+                'title'          => $data['title'] ?? null,
+                'message'        => $data['message'] ?? null,
+                'status'         => $data['status'] ?? 'unread',
+                'read_at'        => $notification->read_at,
+                'created_at'     => $notification->created_at,
+                'updated_at'     => $notification->updated_at,
+            ];
+            return response()->json(['notification' => $result], 200);
+        }
+
 
         $data = $notification->data ?? [];
         $result = [

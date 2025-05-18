@@ -125,6 +125,15 @@ class CertificateController extends Controller
                 'certificate_upload' => $documentUrl,
             ]);
 
+            // After creating the equipment and related records
+            if ($user instanceof \App\Models\FireServiceAgent) {
+                // Find all FEMSAdmin users
+                $admins = \App\Models\FEMSAdmin::all();
+                foreach ($admins as $admin) {
+                    $admin->notify(new \App\Notifications\CertificateCreatedNotification($certificate, $user));
+                }
+            }
+
             return response()->json([
                 'message' => 'Certificate created successfully',
                 'data' => $certificate,

@@ -125,6 +125,15 @@ class EquipmentController extends Controller
                 ]);
             }
 
+        // After creating the equipment and related records
+            if ($user instanceof \App\Models\ServiceProvider) {
+                // Find all FEMSAdmin users
+                $admins = \App\Models\FEMSAdmin::all();
+                foreach ($admins as $admin) {
+                    $admin->notify(new \App\Notifications\EquipmentCreatedNotification($equipment, $user));
+                }
+            }
+
             return response()->json(['message' => 'Equipment created successfully', 'equipment' => $equipment], 201);
         } catch (\Exception $e) {
             // Log the error
