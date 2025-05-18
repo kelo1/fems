@@ -51,7 +51,14 @@ class QRCodeController extends Controller
             $serviceProvider = $equipment->serviceProvider ?? null;
             if ($serviceProvider) {
                 // Send notification using Laravel's notification system only (no manual Notification::create)
-                $serviceProvider->notify(new \App\Notifications\EquipmentQrNotification($equipment, $qrCodeUrl));
+                try {
+                    $serviceProvider->notify(new \App\Notifications\EquipmentQrNotification($equipment, $qrCodeUrl));
+                } catch (\Exception $e) {
+                    \Log::error('Error sending equipment QR notification', [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+                }
             }
 
             return response()->json(['message' => 'QR code generated successfully', 'qr_code_url' => $qrCodeUrl], 201);
@@ -113,7 +120,14 @@ class QRCodeController extends Controller
             $fireServiceAgent = $certificate->fireServiceAgent ?? null;
             if ($fireServiceAgent) {
                 // Send notification using Laravel's notification system only (no manual Notification::create)
-                $fireServiceAgent->notify(new \App\Notifications\CertificateQrNotification($certificate, $qrCodeUrl));
+                try {
+                    $fireServiceAgent->notify(new \App\Notifications\CertificateQrNotification($certificate, $qrCodeUrl));
+                } catch (\Exception $e) {
+                    \Log::error('Error sending certificate QR notification', [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+                }
             }
 
             return response()->json(['message' => 'QR code updated successfully', 'qr_code_url' => $qrCodeUrl], 200);
