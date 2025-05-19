@@ -132,51 +132,23 @@ class ValidatePhoneNumber extends Controller
 
             // Generate a new OTP
             $otp = $this->generateOTP($fields['user_type']);
-          
-            // Format the phone number (e.g., for Ghana, prepend +233)
-           /* $formattedPhone = preg_replace('~^(?:0|\+?233)?~', '+233', $fields['phone']);
+        
+            $formattedPhone = preg_replace('~^(?:0|\+?233)?~', '+233', $phone);
 
             // Twilio client configuration
-            $twilioSid = env('TWILIO_SID');
+            $twilioSid = env('TWILIO_ACCOUNT_SID');
             $twilioToken = env('TWILIO_AUTH_TOKEN');
-            $twilioFrom = env('TWILIO_PHONE_NUMBER'); // Ensure this is a valid Twilio number
 
             $twilio = new \Twilio\Rest\Client($twilioSid, $twilioToken);
 
-            // Send the OTP via SMS
+            // Send the SMS
             $twilio->messages->create(
                 $formattedPhone,
                 [
-                    'from' => $twilioFrom,
-                    'body' => "This is your OTP: $otp",
+                    'messagingServiceSid' => env('TWILIO_MESSAGING_SERVICE_SID'),
+                    'body' => "Your Guardian Safety OTP is: $otp",
                 ]
-            );*/
-            $formattedPhone = preg_replace('~^(?:0|\+?233)?~', '+233', $phone);
-    
-            // AWS SNS client configuration
-            $sns = new \Aws\Sns\SnsClient([
-                'credentials' => [
-                    'key' => env('AWS_ACCESS_KEY_ID'),
-                    'secret' => env('AWS_SECRET_ACCESS_KEY'),
-                ],
-                'region' => env('AWS_DEFAULT_REGION'),
-                'version' => 'latest',
-            ]);
-    
-            // Message payload
-            $args = [
-                'MessageAttributes' => [
-                    'AWS.SNS.SMS.SMSType' => [
-                        'DataType' => 'String',
-                        'StringValue' => 'Transactional',
-                    ],
-                ],
-                'Message' => "Your OTP is: $otp",
-                'PhoneNumber' => $formattedPhone,
-            ];
-    
-            // Send the SMS
-            $sns->publish($args);
+            );
    
 
             // Update the OTP in the database

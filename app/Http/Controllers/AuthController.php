@@ -224,7 +224,7 @@ class AuthController extends Controller
         $user->notify(new \App\Notifications\VerifyEmailNotification($user, $request->name, $request->email, $email_verification, $request->user_type));
 
         DB::commit();
-        return response()->json(['message' => 'User registered successfully', 'user' => $user], 201);
+        return response()->json(['message' => 'User created successfully'], 201);
 
     } catch (\Exception $e) {
         DB::rollBack();
@@ -233,16 +233,15 @@ class AuthController extends Controller
     }
     }
 
- /*   private function sendOtpToPhone($phone, $otp)
+    private function sendOtpToPhone($phone, $otp)
 {
     try {
         // Format the phone number (e.g., for Ghana, prepend +233)
         $formattedPhone = preg_replace('~^(?:0|\+?233)?~', '+233', $phone);
 
         // Twilio client configuration
-        $twilioSid = env('TWILIO_SID');
+        $twilioSid = env('TWILIO_ACCOUNT_SID');
         $twilioToken = env('TWILIO_AUTH_TOKEN');
-        $twilioFrom = env('TWILIO_PHONE_NUMBER');
 
         $twilio = new \Twilio\Rest\Client($twilioSid, $twilioToken);
 
@@ -250,8 +249,8 @@ class AuthController extends Controller
         $twilio->messages->create(
             $formattedPhone,
             [
-                'from' => $twilioFrom,
-                'body' => "Your OTP is: $otp",
+                'messagingServiceSid' => env('TWILIO_MESSAGING_SERVICE_SID'),
+                'body' => "Your Guardian Safety OTP is: $otp",
             ]
         );
 
@@ -260,46 +259,9 @@ class AuthController extends Controller
         \Log::error("Failed to send OTP to $phone", ['error' => $e->getMessage()]);
         throw new \Exception("Failed to send OTP. Please try again.");
     }
-}*/
+}
 
-    private function sendOtpToPhone($phone, $otp)
-    {
-        try {
-            // Format the phone number (e.g., for Ghana, prepend +233)
-            $formattedPhone = preg_replace('~^(?:0|\+?233)?~', '+233', $phone);
-    
-            // AWS SNS client configuration
-            $sns = new \Aws\Sns\SnsClient([
-                'credentials' => [
-                    'key' => env('AWS_ACCESS_KEY_ID'),
-                    'secret' => env('AWS_SECRET_ACCESS_KEY'),
-                ],
-                'region' => env('AWS_DEFAULT_REGION'),
-                'version' => 'latest',
-            ]);
-    
-            // Message payload
-            $args = [
-                'MessageAttributes' => [
-                    'AWS.SNS.SMS.SMSType' => [
-                        'DataType' => 'String',
-                        'StringValue' => 'Transactional',
-                    ],
-                ],
-                'Message' => "Your OTP is: $otp",
-                'PhoneNumber' => $formattedPhone,
-            ];
-    
-            // Send the SMS
-            $sns->publish($args);
-    
-            \Log::info("OTP sent successfully to $formattedPhone");
-        } catch (\Exception $e) {
-            \Log::error("Failed to send OTP to $phone", ['error' => $e->getMessage()]);
-            throw new \Exception("Failed to send OTP. Please try again.");
-        }
-    }
-
+   
      
  // OTP Generation Function
  public function generateOTP($userType)
