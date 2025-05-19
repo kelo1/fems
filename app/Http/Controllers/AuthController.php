@@ -224,7 +224,9 @@ class AuthController extends Controller
         $user->notify(new \App\Notifications\VerifyEmailNotification($user, $request->name, $request->email, $email_verification, $request->user_type));
 
         DB::commit();
-        return response()->json(['message' => 'User created successfully'], 201);
+        return response()->json(['message' => 'User created successfully'
+        , 'user' => $user->only('name', 'phone', 'user_type', 'id'),
+    ], 201);
 
     } catch (\Exception $e) {
         DB::rollBack();
