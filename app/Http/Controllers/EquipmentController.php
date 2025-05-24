@@ -577,6 +577,7 @@ class EquipmentController extends Controller
     public function getEquipmentByID($id)
     {
         try {
+            $user = Auth::user();
             // Retrieve the equipment record with its associated client, service provider, and filtered activities
             $equipment = Equipment::with([
                 'equipmentClients' => function ($query) {
@@ -637,6 +638,18 @@ class EquipmentController extends Controller
                 'equipment_status' => $equipmentStatus,
                 'activities' => $equipment->equipmentActivities,
             ];
+
+                 // If the user is a FEMSAdmin, add the QR code image URL if it exists
+        if ($user instanceof \App\Models\FEMSAdmin) {
+            $qrCode = QRCode::where('serial_number', $equipment->serial_number)->first();
+            if ($qrCode && $qrCode->qr_code_path) {
+                // If stored on S3 or another disk, use Storage::url()
+                $qrCodeUrl = Storage::disk('s3')->url($qrCode->qr_code_path);
+                $response['qr_code_url'] = $qrCodeUrl;
+            } else {
+                $response['qr_code_url'] = null;
+            }
+        }
 
             return response()->json(['message' => 'Equipment retrieved successfully', 'data' => $response], 200);
         } catch (\Exception $e) {

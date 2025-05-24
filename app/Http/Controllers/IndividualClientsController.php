@@ -253,6 +253,7 @@ class IndividualClientsController extends Controller
 
             return response()->json([
                 'message' => 'Individual client created successfully',
+                'client' => $client,
             ], 201);
         } catch (\Exception $e) {
             \DB::rollBack();

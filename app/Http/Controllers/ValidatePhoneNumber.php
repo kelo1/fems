@@ -126,6 +126,8 @@ class ValidatePhoneNumber extends Controller
             // Find the user by phone number
             $user = $model::where('phone', $fields['phone'])->first();
 
+            $phone = $fields['phone'];
+
             if (!$user) {
                 return response()->json(['message' => 'User not found'], 404);
             }
@@ -134,6 +136,9 @@ class ValidatePhoneNumber extends Controller
             $otp = $this->generateOTP($fields['user_type']);
         
             $formattedPhone = preg_replace('~^(?:0|\+?233)?~', '+233', $phone);
+
+            //log event
+            \Log::info("Resending OTP", ['phone' => $formattedPhone]);
 
             // Twilio client configuration
             $twilioSid = env('TWILIO_ACCOUNT_SID');
@@ -150,7 +155,10 @@ class ValidatePhoneNumber extends Controller
                 ]
             );
    
-
+            // Log the SMS sending event
+            \Log::info('OTP sent successfully', [
+                'phone' => $formattedPhone,
+            ]);
             // Update the OTP in the database
             $user->update(['OTP' => $otp]);
 

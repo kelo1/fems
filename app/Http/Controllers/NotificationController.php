@@ -23,6 +23,10 @@ class NotificationController extends Controller
         if($user instanceof \App\Models\FEMSAdmin) {
             $notifications = Notification::where('notifiable_id', $user->id)
                 ->where('notifiable_type', get_class($user))
+                 ->where(function ($query) {
+                $query->whereNull('read_at')
+                      ->orWhereJsonContains('data->status', 'unread');
+                })
                 ->orderBy('created_at', 'desc')
                 ->get()
                 ->map(function ($notification) {
@@ -44,6 +48,10 @@ class NotificationController extends Controller
 
         $notifications = Notification::where('notifiable_id', $user->id)
             ->where('notifiable_type', get_class($user))
+            ->where(function ($query) {
+                $query->whereNull('read_at')
+                      ->orWhereJsonContains('data->status', 'unread');
+            })
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($notification) {
