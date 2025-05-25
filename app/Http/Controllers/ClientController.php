@@ -891,6 +891,7 @@ class ClientController extends Controller
             $request->validate([
                 'id' => 'required|integer|exists:clients,id',
                 'client_type' => 'required|string|in:INDIVIDUAL,CORPORATE',
+                'document_type' => 'required_if:client_type,INDIVIDUAL|string|in:PASSPORT,NATIONAL_ID',
                 'file_meta' => 'required',
                 //'files' => 'required',
                // 'files.*.upload_type' => 'required|string|in:document,certificate_of_incorporation,company_registration',
@@ -936,11 +937,13 @@ class ClientController extends Controller
                         if($fileInfo['upload_type'] === 'document' && $request->hasFile('document_file')){
     
                                 $fileUploads = $request->file('document_file');
-                                
-                                $fileName = 'document_upload_' . $clientId . '_' . now()->format('YmdHis') . '.' . $fileUploads->getClientOriginalExtension();
-                                $fileUploads->storeAs('uploads/individual_clients', $fileName, 'public');
+
+                               // $fileName = 'document_upload_' . $clientId . '_' . now()->format('YmdHis') . '.' . $fileUploads->getClientOriginalExtension();
+                                $fileName = strtolower($request->document_type ?? 'document') . '_upload_' . $clientId . '_' . Str::slug($individualClient->first_name . ' ' . $individualClient->last_name) . '_' . now()->format('YmdHis') . '.' . $fileUploads->getClientOriginalExtension();
+
+                                $fileUploads->storeAs('uploads/individual_clients', $fileName, 's3');
     
-                                $individualClient->update(['document' => $fileName]);
+                                $individualClient->update(['document' => $fileName, 'document_type' => $request->document_type]);
     
                                 return response()->json(['message' => 'Uploads updated successfully for individual client'], 200);
                             }
@@ -982,15 +985,15 @@ class ClientController extends Controller
                                 $file = $request->file('certificate_of_incorporation_file');
     
                                 $fileName = $uploadType . '' . $clientId . '' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
-                                $file->storeAs('uploads/corporate_clients', $fileName, 'public');
+                                $file->storeAs('uploads/corporate_clients', $fileName, 's3');
     
                                 $corporateClient->update(['certificate_of_incorporation' => $fileName]);
                             } elseif ($uploadType === 'company_registration' && $request->hasFile('company_registration_file')) {
     
                                 $file = $request->file('company_registration_file');
-    
+
                                 $fileName = $uploadType . '' . $clientId . '' . now()->format('YmdHis') . '.' . $file->getClientOriginalExtension();
-                                $file->storeAs('uploads/corporate_clients', $fileName, 'public');
+                                $file->storeAs('uploads/corporate_clients', $fileName, 's3');
                                 $corporateClient->update(['company_registration' => $fileName]);
                             }
                         }
