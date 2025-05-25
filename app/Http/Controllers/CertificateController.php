@@ -360,6 +360,19 @@ class CertificateController extends Controller
 
             $certificate->isVerified = $this->isCertificateVerified($certificate->isVerified);
 
+            
+            // Add QR code URL if user is FEMSAdmin
+            if (($user instanceof \App\Models\FEMSAdmin) || ($user instanceof \App\Models\FireServiceAgent)) {
+                $qrCode = \App\Models\QRCode::where('serial_number', $certificate->serial_number)->first();
+                if ($qrCode && $qrCode->qr_code_path) {
+                    $qrCodeUrl = Storage::disk('s3')->url($qrCode->qr_code_path);
+                    $certificate->qr_code_url = $qrCodeUrl;
+                } else {
+                    $certificate->qr_code_url = null;
+                }
+            }
+
+
             return response()->json(['message' => 'Certificate retrieved successfully', 'data' => $certificate], 200);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             \Log::error('Certificate not found in getCertificateByID method', [
