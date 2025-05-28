@@ -97,13 +97,19 @@ class AuthController extends Controller
 
         if (!$user) {
             return response()->json(['message' => 'User not found'], 404);
-        }
-        else{
+        } else {
+            // If SERVICE_PROVIDER, add license_type description directly to the user object
+            if ($userType === 'SERVICE_PROVIDER') {
+                $licenseType = \App\Models\LicenseType::find($user->license_id);
+                $user->license_type_description = $licenseType ? $licenseType->description : null;
+            }
 
-            return response()->json([
+            $response = [
                 'user_type' => $fields['user_type'],
                 'user' => $user,
-            ]);
+            ];
+
+            return response()->json($response);
         }
 
 
