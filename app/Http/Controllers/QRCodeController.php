@@ -90,7 +90,7 @@ class QRCodeController extends Controller
             $certificate = Certificate::where('serial_number', $serial_number)->firstOrFail();
 
             // Generate the URL to embed in the QR code
-            $url = URL::to('/certificate-details?certifcate=' . $serial_number);
+            $url = URL::to('/certificate-overview?certifcate=' . $serial_number);
 
             // Generate QR code from the URL
             $qrCodePng = SimpleQrCode::format('png')

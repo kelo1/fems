@@ -99,11 +99,28 @@ class EquipmentController extends Controller
             $serial_number = substr(md5($uuid), 0, 15);
 
             // Create the equipment
-            $equipment = Equipment::create(array_merge($request->all(), [
-                'serial_number' => $serial_number, // Use the same serial_number
-                'created_by' => $user->id,
-                'created_by_type' => get_class($user),
-            ]));
+           // Only allow the fields you want to save
+        $data = [
+            'name' => $request->input('name'),
+            'description' => $request->input('description'),
+            'date_of_manufacturing' => $request->input('date_of_manufacturing'),
+            'expiry_date' => $request->input('expiry_date'),
+            'serial_number' => $serial_number,
+            'created_by' => $user->id,
+            'created_by_type' => get_class($user),
+        ];
+
+        // Only add service_provider_id if it is present and not null
+        if ($request->filled('service_provider_id')) {
+            $data['service_provider_id'] = $request->input('service_provider_id');
+        }
+
+        // Only add client_id if it is present and not null
+        if ($request->filled('client_id')) {
+            $data['client_id'] = $request->input('client_id');
+        }
+
+        $equipment = Equipment::create($data);
 
             // Create a record in EquipmentClient
             if ($request->client_id) {
@@ -401,11 +418,17 @@ class EquipmentController extends Controller
                     $client->created_by = $request->service_provider_id;
                     $client->save();
 
+                    
+
                     \Log::info('Client record updated successfully', [
                         'client_id' => $client->id,
                         'new_service_provider_id' => $request->service_provider_id,
                     ]);
                 }
+
+                // Update the equipment's service_provider_id
+                    $equipment->service_provider_id = $request->service_provider_id;
+                    $equipment->save();
 
                 // Deactivate the current service provider record
                 $deactivated = \DB::table('equipment_service_providers')
@@ -543,7 +566,9 @@ class EquipmentController extends Controller
                 \DB::table('equipment_service_providers')
                     ->where('equipment_id', $id)
                     ->where('status_service_provider', 1)
-                    ->update(['status_service_provider' => 0]);
+                    ->update(['status_service_provider' => 0,
+                    'created_by'=>$request->service_provider_id,
+                    'created_by_type' => 'App\Models\ServiceProvider']);
 
                 // Update the service provider ID in the equipment record
                 $equipment->service_provider_id = $request->service_provider_id;
@@ -667,9 +692,9 @@ class EquipmentController extends Controller
     {
         try {
             // Retrieve all equipment created by the given service provider
-            $equipment = Equipment::where('created_by', $service_provider_id) // Filter by service provider who created the equipment
-                ->where('created_by_type', 'App\Models\ServiceProvider') // Ensure the created_by_type is ServiceProvider
-                ->get();
+            $equipment = Equipment::where('service_provider_id', $service_provider_id)->get(); // Filter by service provider who created the equipment
+               // ->where('created_by_type', 'App\Models\ServiceProvider') // Ensure the created_by_type is ServiceProvider
+                
 
             if ($equipment->isEmpty()) {
                 return response()->json(['message' => 'No equipment found for the specified service provider'], 200);
