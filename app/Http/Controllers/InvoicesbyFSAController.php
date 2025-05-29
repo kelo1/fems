@@ -73,13 +73,12 @@ class InvoicesbyFSAController extends Controller
     public function generateInvoice(Request $request)
     {
         try {
-           
             $user = Auth::user();
             if (!$user) {
                 \Log::error('Unauthorized access attempt');
                 return response(['message' => 'Unauthorized'], 403);
             }
-            
+
             // Check if the user is a Fire Service Agent
             $user = FireServiceAgent::find($user->id);
             if (!$user) {
@@ -89,10 +88,8 @@ class InvoicesbyFSAController extends Controller
 
             $client_id = $request->client_id;
             $Invoice_items = $request->InvoiceItems;
-            // Accept discount as an optional field
-            $discount = $request->input('discount', 0);
 
-            if (!$client_id  || !$Invoice_items) {
+            if (!$client_id || !$Invoice_items) {
                 \Log::error('Missing required parameters', [
                     'client_id' => $client_id,
                     'InvoiceItems' => $Invoice_items,
@@ -103,12 +100,11 @@ class InvoicesbyFSAController extends Controller
             // Validate the request data
             $request->validate([
                 'client_id' => 'required|integer',
-                'InvoiceItems' => 'required|array', // Updated to expect an array
+                'InvoiceItems' => 'required|array',
             ]);
 
             \Log::info('Request validated successfully');
 
-           
             // Get client type
             $client_type = Client::where('id', $client_id)->value('client_type');
             if (!$client_type) {
@@ -117,7 +113,6 @@ class InvoicesbyFSAController extends Controller
             }
             \Log::info('Client type retrieved', ['client_type' => $client_type]);
 
-            
             // Get client details
             $client = null;
             if ($client_type == 'CORPORATE') {
@@ -166,63 +161,61 @@ class InvoicesbyFSAController extends Controller
             \Log::info('Buyer party created', ['buyer' => $buyer]);
 
             // Use InvoiceItems directly as an array
-            $InvoiceDecoded = $Invoice_items; // No need for json_decode
+            $InvoiceDecoded = $Invoice_items;
             \Log::info('Invoice items decoded', ['InvoiceDecoded' => $InvoiceDecoded]);
 
             $items = [];
             $totalAmount = 0;
-            $totalWithholdingTax = 0; // Track total withholding tax
+            $totalWithholdingTax = 0;
+            $totalDiscount = 0;
 
             foreach ($InvoiceDecoded as $key => $invoiceitem) {
                 $billingItemId = $invoiceitem['billingitem_' . $key];
-            
+
                 // Fetch the billing item once
                 $billingItem = Billing::find($billingItemId);
-            
+
                 if (!$billingItem) {
                     \Log::warning("Billing item not found", ['billing_item_id' => $billingItemId]);
                     continue;
                 }
-            
+
                 // Extract necessary data from billing item
                 $itemDescription = $billingItem->DESCRIPTION;
                 $isVatApplicable = $billingItem->VAT_APPLICABLE == 1;
                 $isWithholdingApplicable = $billingItem->WITH_HOLDING_APPLICABLE == 1;
-            
-                // Use rates only if applicable, otherwise default to 0.0
+
                 $vatRate = $isVatApplicable ? ($billingItem->VAT_RATE ?? 0.0) : 0.0;
                 $withholdingRate = $isWithholdingApplicable ? ($billingItem->WITH_HOLDING_RATE ?? 0.0) : 0.0;
-            
-                // Log the extracted values
-                \Log::info('Billing values retrieved', [
-                    'description' => $itemDescription,
-                    'vat_applicable' => $isVatApplicable,
-                    'withholding_applicable' => $isWithholdingApplicable,
-                    'vat_rate' => $vatRate,
-                    'withholding_rate' => $withholdingRate,
-                    'fsa_id' => $user->id,
-                ]);
-            
-                // Prices and quantities from decoded invoice input
+
                 $pricePerUnit = $invoiceitem['amount_' . $key];
                 $quantity = $invoiceitem['quantity_' . $key];
-            
-                // Calculate subtotal and taxes
+
+                // Support per-item discount (default to 0 if not present)
+                $itemDiscount = isset($invoiceitem['discount_' . $key]) ? floatval($invoiceitem['discount_' . $key]) : 0;
+
                 $subtotal = $pricePerUnit * $quantity;
                 $vatAmount = round($subtotal * ($vatRate / 100), 2);
                 $withholdingAmount = round($subtotal * ($withholdingRate / 100), 2);
-            
-                // Update totals
-                $totalAmount += $subtotal + $vatAmount;
+
+                // Apply discount per item
+                $itemTotal = $subtotal + $vatAmount - $itemDiscount;
+
+                $totalAmount += $itemTotal;
                 $totalWithholdingTax += $withholdingAmount;
-            
-                // Create and push the invoice item
+                $totalDiscount += $itemDiscount;
+
                 $item = (new InvoiceItem())
                     ->title($itemDescription)
                     ->pricePerUnit($pricePerUnit)
                     ->quantity($quantity)
-                    ->taxByPercent($vatRate); // Laravel Daily Invoice tax field
-            
+                    ->taxByPercent($vatRate);
+
+                // Add discount info to the item description if present
+                if ($itemDiscount > 0) {
+                    $item->description('Discount: GH₵' . number_format($itemDiscount, 2));
+                }
+
                 $items[] = $item;
 
                 \Log::info('Invoice item processed', [
@@ -232,25 +225,17 @@ class InvoicesbyFSAController extends Controller
                     'subtotal' => $subtotal,
                     'vat_amount' => $vatAmount,
                     'withholding_tax' => $withholdingAmount,
+                    'item_discount' => $itemDiscount,
                 ]);
             }
-            
 
             // Deduct total withholding tax from the total amount
             $totalAmount -= $totalWithholdingTax;
 
-            // Apply discount if provided and greater than 0
-            $finalAmount = $totalAmount;
-            $discountNote = '';
-            if ($discount && $discount > 0) {
-                $finalAmount -= $discount;
-                $discountNote = "Discount applied: GH₵" . number_format($discount, 2);
-            }
-
             // Prepare notes for the invoice
             $notes = "Withholding tax (not deducted from payable amount): GH₵" . number_format($totalWithholdingTax, 2);
-            if ($discountNote) {
-                $notes .= "\n" . $discountNote;
+            if ($totalDiscount > 0) {
+                $notes .= "\nTotal Discount applied: GH₵" . number_format($totalDiscount, 2);
             }
 
             $invoice_number = $this->generateRandomSequence();
@@ -286,7 +271,7 @@ class InvoicesbyFSAController extends Controller
                 'client_id' => $client_id,
                 'invoice_details' => json_encode($Invoice_items), // Save as JSON string
                 'invoice' => $invoice->filename,
-                'payment_amount' => $finalAmount,
+                'payment_amount' => $totalAmount,
                 'created_by' => $user->id,
                 'created_by_type' => get_class($user),
                 'payment_status' => 0,
@@ -300,7 +285,8 @@ class InvoicesbyFSAController extends Controller
                 'url' => Storage::disk('s3')->url('invoices/' . $invoice->filename),
                 'filename' => $invoice->filename,
                 'total_withholding_tax' => $totalWithholdingTax,
-                'total_amount' => $finalAmount,
+                'total_discount' => $totalDiscount,
+                'total_amount' => $totalAmount,
             ], 201);
         } catch (\Exception $e) {
             \Log::error('Exception occurred in generateInvoice (FSA)', [
