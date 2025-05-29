@@ -115,10 +115,13 @@ class InvoicesbyFSAController extends Controller
 
             // Get client details
             $client = null;
+             $individual_client_email = null;
             if ($client_type == 'CORPORATE') {
                 $client = Corporate_clients::with('client')->where('client_id', $client_id)->first();
             } else {
                 $client = Individual_clients::with('client')->where('client_id', $client_id)->first();
+                $individual_client_email = Client::where('id', $client_id)->value('email');
+
             }
             if (!$client) {
                 \Log::error('Client details not found', ['client_id' => $client_id]);
@@ -127,7 +130,7 @@ class InvoicesbyFSAController extends Controller
             \Log::info('Client details retrieved', ['client' => $client]);
 
             $client_name = $client_type == 'CORPORATE' ? $client->company_name : $client->first_name . ' ' . $client->last_name;
-            $client_email = $client_type == 'CORPORATE' ? $client->company_email : $client->email;
+            $client_email = $client_type == 'CORPORATE' ? $client->company_email : $individual_client_email;
             $client_phone = $client_type == 'CORPORATE' ? $client->company_phone : $client->phone;
             $client_address = $client_type == 'CORPORATE' ? $client->company_address : $client->address;
             $client_branch = $client_type == 'CORPORATE' ? $client->branch_name : null;
