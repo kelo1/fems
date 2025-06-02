@@ -237,7 +237,11 @@ class InvoicingController extends Controller
                 $quantity = $invoiceitem['quantity_' . $key];
 
                 // Support per-item discount (default to 0 if not present)
-                $itemDiscount = isset($invoiceitem['discount_' . $key]) ? floatval($invoiceitem['discount_' . $key]) : 0;
+                $itemDiscountPercent = isset($invoiceitem['discount_' . $key]) ? floatval($invoiceitem['discount_' . $key]) : 0;
+
+                // Calculate discount value based on percentage
+                $itemDiscount = round(($itemDiscountPercent / 100) * ($pricePerUnit * $quantity), 2);
+
 
                 $subtotal = $pricePerUnit * $quantity;
                 $vatAmount = round($subtotal * ($vatRate / 100), 2);
