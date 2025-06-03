@@ -242,13 +242,17 @@ class InvoicingController extends Controller
                 // Calculate discount value based on percentage
                 $itemDiscount = round(($itemDiscountPercent / 100) * ($pricePerUnit * $quantity), 2);
 
+                // Calculate discounted price per unit
+                $discountedPricePerUnit = $pricePerUnit;
+                if ($itemDiscount > 0 && $quantity > 0) {
+                    $discountedPricePerUnit = round($pricePerUnit - ($itemDiscount / $quantity), 2);
+                }
 
-                $subtotal = $pricePerUnit * $quantity;
+                $subtotal = $discountedPricePerUnit * $quantity;
                 $vatAmount = round($subtotal * ($vatRate / 100), 2);
                 $withholdingAmount = round($subtotal * ($withholdingRate / 100), 2);
 
-                // Apply discount per item
-                $itemTotal = $subtotal + $vatAmount - $itemDiscount;
+                $itemTotal = $subtotal + $vatAmount;
 
                 $totalAmount += $itemTotal;
                 $totalWithholdingTax += $withholdingAmount;
@@ -262,15 +266,15 @@ class InvoicingController extends Controller
 
                 // Optionally, you can add discount info to the item custom fields
                 if ($itemDiscount > 0) {
-                      $item->description('Discount: GH₵' . number_format($itemDiscount, 2));
-            }
+                    $item->description('Discount: ' . $itemDiscountPercent . '% (GH₵' . number_format($itemDiscount, 2) . ')');
+                }
 
                 $items[] = $item;
 
                 \Log::info('Invoice item processed', [
                     'description' => $itemDescription,
                     'quantity' => $quantity,
-                    'amount' => $pricePerUnit,
+                    'amount' => $discountedPricePerUnit,
                     'subtotal' => $subtotal,
                     'vat_amount' => $vatAmount,
                     'withholding_tax' => $withholdingAmount,
@@ -278,8 +282,23 @@ class InvoicingController extends Controller
                 ]);
             }
 
-            // Deduct total withholding tax from the total amount
-            $totalAmount -= $totalWithholdingTax;
+            // Add discount as a negative line item if any discount was applied
+            if ($totalDiscount > 0) {
+                $discountItem = (new InvoiceItem())
+                    ->title('Total Discount')
+                    ->pricePerUnit(-$totalDiscount)
+                    ->quantity(1);
+                $items[] = $discountItem;
+            }
+
+            // Add withholding tax as a negative line item if any withholding tax was applied
+            if ($totalWithholdingTax > 0) {
+                $withholdingItem = (new InvoiceItem())
+                    ->title('Withholding Tax')
+                    ->pricePerUnit(-$totalWithholdingTax)
+                    ->quantity(1);
+                $items[] = $withholdingItem;
+            }
 
             // Prepare notes for the invoice
             $notes = "Withholding tax (not deducted from payable amount): GH₵" . number_format($totalWithholdingTax, 2);
