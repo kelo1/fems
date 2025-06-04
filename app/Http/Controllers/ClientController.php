@@ -1062,4 +1062,50 @@ class ClientController extends Controller
             return response()->json(['message' => 'An error occurred while retrieving the client history'], 500);
         }
     }
+
+    public function verifyClientEmail(Request $request)
+    {
+        try {
+            $request->validate([
+                'email' => 'required|email'
+            ]);
+
+            $email = $request->input('email');
+
+            $existsInClients = Client::where('email', $email)->exists();
+            $existsInCorporate = Corporate_clients::where('company_email', $email)->exists();
+
+            if ($existsInClients || $existsInCorporate) {
+                return response()->json(['message' => 'The client email already exists'], 409);
+            }
+
+            return response()->json(['message' => 'Email is available'], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error in verifyClientEmail', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'An error occurred', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function verifyClientPhone(Request $request)
+    {
+        try {
+            $request->validate([
+                'phone' => 'required|string'
+            ]);
+
+            $phone = $request->input('phone');
+
+            $existsInClients = Client::where('phone', $phone)->exists();
+            $existsInCorporate = Corporate_clients::where('company_phone', $phone)->exists();
+
+            if ($existsInClients || $existsInCorporate) {
+                return response()->json(['message' => 'The client phone number already exists'], 409);
+            }
+
+            return response()->json(['message' => 'Phone number is available'], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error in verifyClientPhone', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'An error occurred', 'error' => $e->getMessage()], 500);
+        }
+    }
 }

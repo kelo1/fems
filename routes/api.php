@@ -146,6 +146,12 @@ Route::group(['middleware'=>['web','auth:sanctum']], function(){
 
   Route::get('/individual_clients', [IndividualClientsController::class, 'index'])->name('all_individual_clients_admin');
 
+  // Validate Client Phone Number and Email Routes
+  
+Route::post('/client/verify_email', [ClientController::class, 'verifyClientEmail'])->name('verify_client_email');
+Route::post('/client/verify_phone', [ClientController::class, 'verifyClientPhone'])->name('verify_client_phone');
+
+
   
   //Protected FEMS Admin Routes
   Route::get('/fems_admin/all', [FEMSAdminController::class, 'index'])->name('all_fire_service_admins');

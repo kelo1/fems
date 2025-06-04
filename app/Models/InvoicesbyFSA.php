@@ -13,6 +13,7 @@ class InvoicesbyFSA extends Model
     protected $fillable = [
         'fsa_id',
         'invoice_number',
+        'certificate_serial_number', // Serial number of the certificate, if applicable
         'client_id',
         'invoice_details',
         'invoice',

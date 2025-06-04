@@ -16,6 +16,7 @@ class Certificate extends Model
         'client_id',
         'fsa_id',
         'isVerified',
+        'invoice_status',
         'certificate_upload',
         'serial_number',
         'issued_date',

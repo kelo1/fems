@@ -17,6 +17,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('fsa_id')->constrained('fire_service_agents')->onDelete('cascade');
             $table->string('invoice_number')->unique();
+            $table->string('certificate_serial_number')->nullable(); // Serial number of the certificate, if applicable
             $table->foreignId('client_id')->constrained('clients')->onDelete('cascade');
             $table->text('invoice_details');
             $table->string('invoice');

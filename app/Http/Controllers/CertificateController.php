@@ -44,6 +44,8 @@ class CertificateController extends Controller
                         ->where('client_id', $certificate->client->id)
                         ->value('company_name');
                 }
+             $certificate->invoice_status = $this->isCertificateInvoiced($certificate->invoice_status);
+    
             }
             return $certificate;
         });
@@ -305,6 +307,9 @@ class CertificateController extends Controller
                             ->where('client_id', $certificate->client->id)
                             ->value('company_name');
                     }
+            $certificate->isVerified = $this->isCertificateVerified($certificate->isVerified);
+            $certificate->invoice_status = $this->isCertificateInvoiced($certificate->invoice_status);
+
                 }
                 return $certificate;
             });
@@ -359,6 +364,7 @@ class CertificateController extends Controller
             }
 
             $certificate->isVerified = $this->isCertificateVerified($certificate->isVerified);
+            $certificate->invoice_status = $this->isCertificateInvoiced($certificate->invoice_status);
 
             
             // Add QR code URL if user is FEMSAdmin
@@ -429,6 +435,8 @@ class CertificateController extends Controller
             }
 
             $certificate->isVerified = $this->isCertificateVerified($certificate->isVerified);
+            $certificate->invoice_status = $this->isCertificateInvoiced($certificate->invoice_status);
+
 
             return response()->json(['message' => 'Certificate retrieved successfully', 'data' => $certificate], 200);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -470,6 +478,7 @@ class CertificateController extends Controller
             // Add isVerified status to each certificate
             $certificates = $certificates->map(function ($certificate) {
                 $certificate->isVerified = $this->isCertificateVerified($certificate->isVerified);
+                $certificate->invoice_status = $this->isCertificateInvoiced($certificate->invoice_status);
                 return $certificate;
             });
 
@@ -485,5 +494,17 @@ class CertificateController extends Controller
     private function isCertificateVerified($isVerified)
     {
         return $isVerified == 1 ? 'verified' : 'not verified';
+    }
+
+    private function isCertificateInvoiced($invoice_status)
+    {
+        switch ($invoice_status) {
+            case 0:
+                return 'not invoiced';
+            case 1:
+                return 'invoiced';
+            default:
+                return 'unknown status';
+        }
     }
 }

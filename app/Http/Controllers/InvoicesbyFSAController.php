@@ -10,6 +10,7 @@ use App\Models\Client;
 use App\Models\Corporate_clients;
 use App\Models\Individual_clients;
 use App\Models\FireServiceAgent;
+use App\Models\Certificate;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use LaravelDaily\Invoices\Invoice;
@@ -88,6 +89,7 @@ class InvoicesbyFSAController extends Controller
 
             $client_id = $request->client_id;
             $Invoice_items = $request->InvoiceItems;
+            $certificate_serial_number = $request->serial_number;
 
             if (!$client_id || !$Invoice_items) {
                 \Log::error('Missing required parameters', [
@@ -292,10 +294,12 @@ class InvoicesbyFSAController extends Controller
 
             \Log::info('FSA Invoice generated', ['filename' => $invoice->filename]);
 
+            
             // Save invoice details to the database
             DB::table('invoices_by_fsa')->insert([
                 'fsa_id' => $user->id,
                 'invoice_number' => $invoice->getSerialNumber(),
+                'certificate_serial_number' => $certificate_serial_number, // Save the certificate serial number if provided
                 'client_id' => $client_id,
                 'invoice_details' => json_encode($Invoice_items), // Save as JSON string
                 'invoice' => $invoice->filename,
@@ -307,6 +311,21 @@ class InvoicesbyFSAController extends Controller
                 'updated_at' => Carbon::now(),
             ]);
             \Log::info('FSA Invoice record inserted into database');
+            
+            // get the invoice ID
+            $invoiceId = DB::getPdo()->lastInsertId();
+
+            // Update invoice status in the Certificate table
+            // Check if a certificate exists for this invoice and client before updating
+            $certificate = Certificate::where('fsa_id', $user->id)
+                ->where('client_id', $client_id)
+                ->where('serial_number', $certificate_serial_number)
+                ->first();
+
+            if ($certificate && $certificate->invoice_status == 0) {
+                $certificate->invoice_status = 1;
+                $certificate->save();
+            }
 
             return response([
                 'message' => 'FSA Invoice generated successfully!',
