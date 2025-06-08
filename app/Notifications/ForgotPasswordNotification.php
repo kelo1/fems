@@ -55,11 +55,12 @@ class ForgotPasswordNotification extends Notification
      */
     public function toMail($notifiable)
     {
-        // Generate the reset password URL
-        $url = URL::to('https://guardiansafetyapp.com/reset_password?email_token=');
-
-        // Append the user type and ID to the URL
-        $resetPasswordUrl = $url . $this->email_id . '&id=' . $this->user->id . '&user_type=' . $this->user_type;
+     
+         // Build the reset password URL with proper query parameters
+        $resetPasswordUrl = URL::to('https://guardiansafetyapp.com/reset_password') .
+            '?email_token=' . urlencode($this->email_id ?? '') .
+            '&id=' . urlencode($this->user->id) .
+            '&user_type=' . urlencode($this->user_type);
 
         return (new MailMessage)
             ->greeting('Hello ' . $this->user_name . ',')
