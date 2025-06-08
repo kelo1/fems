@@ -27,13 +27,13 @@ class ForgotPasswordNotification extends Notification
      * @param  string $email_id
      * @param  string $user_type
      */
-    public function __construct($user, $user_name, $toAddress, $email_id, $user_type)
+    
+    public function __construct($user, $user_name, $toAddress, $email_id)
     {
         $this->user = $user;
         $this->user_name = $user_name;
         $this->toAddress = $toAddress;
         $this->email_id = $email_id;
-        $this->user_type = $user_type;
     }
 
     /**

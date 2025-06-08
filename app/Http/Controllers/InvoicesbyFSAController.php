@@ -161,6 +161,7 @@ class InvoicesbyFSAController extends Controller
                 'custom_fields' => [
                     'email' => $client_email,
                     'address' => $client_address,
+                    'Certificate serial number' => $certificate_serial_number ?? 'N/A',
                 ],
             ]);
             \Log::info('Buyer party created', ['buyer' => $buyer]);
