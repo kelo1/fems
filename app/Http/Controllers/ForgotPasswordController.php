@@ -86,7 +86,7 @@ class ForgotPasswordController extends Controller
         $userName = $user->name ?? 'User';
 
         // Send the password reset notification
-        $user->notify(new ForgotPasswordNotification($user, $userName, $email, $token));
+        $user->notify(new ForgotPasswordNotification($user, $userName, $email, $token, $userType));
 
         // Return a success response
         return response()->json([
