@@ -65,7 +65,6 @@ class ForgotPasswordNotification extends Notification
 
         return (new MailMessage)
             ->greeting('Hello ' . $this->user_name . ',')
-            ->from('admin@guardiansafetyapp.com')
             ->replyTo($this->toAddress)
             ->subject('Reset Your Password')
             ->line('We received a request to reset your password. Click the link below to reset it.')
