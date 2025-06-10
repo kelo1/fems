@@ -41,7 +41,7 @@ class NotifyEquipmentMaintenance extends Command
         // Find equipment nearing maintenance expiry (1 week before expiry)
         $equipmentExpiringSoon = Equipment::with('client')
             ->where('expiry_date', $oneWeekFromNow->toDateString())
-            ->where('status', 'active')
+            ->where('isActive', 1)// Only notify for active equipment
             ->get();
 
         // Notify service providers and clients about equipment expiring soon
@@ -52,14 +52,12 @@ class NotifyEquipmentMaintenance extends Command
         // Find equipment that has already expired
         $expiredEquipment = Equipment::with('client')
             ->where('expiry_date', '<', $today->toDateString())
-            ->where('status', 'active') // Only notify for active equipment
+            ->where('isActive', 1) // Only notify for active equipment
             ->get();
 
         // Update the status of expired equipment and notify
         foreach ($expiredEquipment as $equipment) {
-            $equipment->status = 'expired';
-            $equipment->save();
-
+        
             $this->sendMaintenanceNotification($equipment, 'expired');
         }
 

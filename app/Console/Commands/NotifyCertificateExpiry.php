@@ -39,7 +39,7 @@ class NotifyCertificateExpiry extends Command
         // Find certificates expiring in 1 week
         $certificatesExpiringSoon = Certificate::with('fireServiceAgent', 'client')
             ->where('expiry_date', $oneWeekFromNow->toDateString())
-            ->where('status', 'active')
+            ->where('isVerified', 1)
             ->get();
 
         // Notify fire service agents and clients about certificates expiring soon
@@ -50,14 +50,12 @@ class NotifyCertificateExpiry extends Command
         // Find certificates that have already expired
         $expiredCertificates = Certificate::with('fireServiceAgent', 'client')
             ->where('expiry_date', '<', $today->toDateString())
-            ->where('status', 'active') // Only notify for active certificates
+            ->where('isVerified', 1) // Only notify for verified certificates
             ->get();
 
         // Update the status of expired certificates and notify
         foreach ($expiredCertificates as $certificate) {
-            $certificate->status = 'expired';
-            $certificate->save();
-
+       
             $this->sendExpiryNotification($certificate, 'expired');
         }
 

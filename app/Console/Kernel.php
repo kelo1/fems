@@ -8,15 +8,15 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 class Kernel extends ConsoleKernel
 {
     /**
-     * Define the application's command schedule.
+     * The application's command schedule.
      *
      * @param  \Illuminate\Console\Scheduling\Schedule  $schedule
      * @return void
      */
     protected function schedule(Schedule $schedule)
     {
-       // Schedule the certificate expiry notification command to run daily
-        $schedule->command('notify:certificate-expiry')->daily();
+        $schedule->command('notify:equipment-maintenance')->weeklyOn(1, '8:00');
+        $schedule->command('notify:certificate-expiry')->weeklyOn(1, '8:00');
     }
 
     /**
@@ -30,4 +30,14 @@ class Kernel extends ConsoleKernel
 
         require base_path('routes/console.php');
     }
+
+    /**
+     * The application's artisan commands.
+     *
+     * @var array
+     */
+    protected $commands = [
+        \App\Console\Commands\NotifyCertificateExpiry::class,
+        \App\Console\Commands\NotifyEquipmentMaintenance::class,
+    ];
 }
