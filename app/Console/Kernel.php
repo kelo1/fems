@@ -17,6 +17,7 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('notify:equipment-maintenance')->weeklyOn(1, '8:00');
         $schedule->command('notify:certificate-expiry')->weeklyOn(1, '8:00');
+        $schedule->command('command:refresh-backend')->dailyAt('21:00');
     }
 
     /**
